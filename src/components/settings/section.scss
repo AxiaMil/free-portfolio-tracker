@@ -1,0 +1,17 @@
+// Shared look of the settings sections (used with @use inside scoped styles).
+.sec { color: var(--text); font-size: 14px; }
+.sec-h { font-size: 12px; font-weight: 600; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.sec-h.mt { margin-top: 24px; }
+.row { display: flex; align-items: center; gap: 14px; padding: 4px 0; }
+.r-t { font-size: 15px; font-weight: 500; }
+.r-d { font-size: 13px; line-height: 19px; color: var(--text-2); flex: 1; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--primary); color: var(--primary-fg);
+  font: 600 13.5px/1 var(--font); letter-spacing: 1px; cursor: pointer; white-space: nowrap;
+  &:hover { filter: brightness(1.08); }
+}
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; color: var(--text);
+  font: 600 13.5px/1 var(--font); letter-spacing: 1px; cursor: pointer; white-space: nowrap;
+  &:hover { background: var(--hover); }
+}

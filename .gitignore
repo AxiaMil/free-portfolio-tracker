@@ -1,0 +1,19 @@
+# dependencies and build output
+node_modules/
+dist/
+
+# your portfolio, market data cache and backups — never commit these
+data/
+
+# local tooling and OS files
+.claude/
+.vscode/
+.idea/
+.DS_Store
+*.log
+.env
+.env.*
+*.local
+
+# scratch files for local tooling
+.tmp/

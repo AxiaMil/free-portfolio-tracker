@@ -1,0 +1,333 @@
+{
+  "version": 1,
+  "activePortfolioId": "p1",
+  "preferences": {
+    "hideValues": false,
+    "decimalSeparator": ".",
+    "thousandSeparator": ",",
+    "costMethod": "FIFO",
+    "accent": "#7C4DFF",
+    "userInitial": "D"
+  },
+  "portfolios": [
+    {
+      "id": "p1",
+      "name": "Demo Portfolio",
+      "currency": "USD",
+      "benchmark": "^GSPC",
+      "benchmarks": [
+        "^GSPC",
+        "^IXIC",
+        "^DJI",
+        "QQQ"
+      ],
+      "dividendTaxRate": 15,
+      "autoDividend": true,
+      "margin": false,
+      "transactions": [
+        {
+          "id": "t0001",
+          "date": "2022-01-10",
+          "action": "Deposit",
+          "symbol": "CASH",
+          "price": 1,
+          "currency": "USD",
+          "shares": 20000,
+          "commission": 0,
+          "note": ""
+        },
+        {
+          "id": "t0002",
+          "date": "2022-01-10",
+          "action": "Buy",
+          "symbol": "VOO",
+          "price": 428.03,
+          "currency": "Market",
+          "shares": 15,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0003",
+          "date": "2022-01-10",
+          "action": "Buy",
+          "symbol": "AAPL",
+          "price": 172.19,
+          "currency": "Market",
+          "shares": 30,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0004",
+          "date": "2022-02-14",
+          "action": "Buy",
+          "symbol": "MSFT",
+          "price": 295,
+          "currency": "Market",
+          "shares": 20,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0005",
+          "date": "2022-03-15",
+          "action": "Buy",
+          "symbol": "KO",
+          "price": 59.62,
+          "currency": "Market",
+          "shares": 60,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0006",
+          "date": "2022-05-16",
+          "action": "Buy",
+          "symbol": "JNJ",
+          "price": 178.08,
+          "currency": "Market",
+          "shares": 25,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0007",
+          "date": "2022-06-21",
+          "action": "Buy",
+          "symbol": "AMZN",
+          "price": 108.68,
+          "currency": "Market",
+          "shares": 40,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0008",
+          "date": "2022-09-12",
+          "action": "Buy",
+          "symbol": "GOOGL",
+          "price": 110.86,
+          "currency": "Market",
+          "shares": 35,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0009",
+          "date": "2022-11-14",
+          "action": "Buy",
+          "symbol": "0700.HK",
+          "price": 247.51,
+          "currency": "Market",
+          "shares": 100,
+          "commission": 18,
+          "note": ""
+        },
+        {
+          "id": "t0010",
+          "date": "2023-01-17",
+          "action": "Buy",
+          "symbol": "VOO",
+          "price": 365.67,
+          "currency": "Market",
+          "shares": 10,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0011",
+          "date": "2023-03-13",
+          "action": "Buy",
+          "symbol": "NVDA",
+          "price": 229.66,
+          "currency": "Market",
+          "shares": 4,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0012",
+          "date": "2023-06-12",
+          "action": "Buy",
+          "symbol": "ASML.AS",
+          "price": 671.5,
+          "currency": "Market",
+          "shares": 8,
+          "commission": 4,
+          "note": ""
+        },
+        {
+          "id": "t0013",
+          "date": "2023-09-18",
+          "action": "Buy",
+          "symbol": "AAPL",
+          "price": 177.97,
+          "currency": "Market",
+          "shares": 15,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0014",
+          "date": "2024-01-16",
+          "action": "Buy",
+          "symbol": "MSFT",
+          "price": 390.27,
+          "currency": "Market",
+          "shares": 10,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0015",
+          "date": "2024-04-15",
+          "action": "Buy",
+          "symbol": "VOO",
+          "price": 463.61,
+          "currency": "Market",
+          "shares": 8,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0016",
+          "date": "2024-08-05",
+          "action": "Buy",
+          "symbol": "NVDA",
+          "price": 100.45,
+          "currency": "Market",
+          "shares": 30,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0017",
+          "date": "2024-11-11",
+          "action": "Sell",
+          "symbol": "AAPL",
+          "price": 224.23,
+          "currency": "Market",
+          "shares": 20,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0018",
+          "date": "2024-12-16",
+          "action": "Withdraw",
+          "symbol": "CASH",
+          "price": 1,
+          "currency": "USD",
+          "shares": 2000,
+          "commission": 0,
+          "note": ""
+        },
+        {
+          "id": "t0019",
+          "date": "2025-02-10",
+          "action": "Buy",
+          "symbol": "AMZN",
+          "price": 233.14,
+          "currency": "Market",
+          "shares": 10,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0020",
+          "date": "2025-04-08",
+          "action": "Buy",
+          "symbol": "GOOGL",
+          "price": 144.7,
+          "currency": "Market",
+          "shares": 20,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0021",
+          "date": "2025-04-08",
+          "action": "Buy",
+          "symbol": "NVDA",
+          "price": 96.3,
+          "currency": "Market",
+          "shares": 25,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0022",
+          "date": "2025-08-11",
+          "action": "Buy",
+          "symbol": "KO",
+          "price": 70.75,
+          "currency": "Market",
+          "shares": 40,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0023",
+          "date": "2025-10-13",
+          "action": "Buy",
+          "symbol": "0700.HK",
+          "price": 639,
+          "currency": "Market",
+          "shares": 100,
+          "commission": 18,
+          "note": ""
+        },
+        {
+          "id": "t0024",
+          "date": "2026-03-16",
+          "action": "Buy",
+          "symbol": "VOO",
+          "price": 615.19,
+          "currency": "Market",
+          "shares": 6,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0025",
+          "date": "2026-06-15",
+          "action": "Buy",
+          "symbol": "MSFT",
+          "price": 399.76,
+          "currency": "Market",
+          "shares": 5,
+          "commission": 1,
+          "note": ""
+        },
+        {
+          "id": "t0026",
+          "date": "2026-09-14",
+          "action": "Buy",
+          "symbol": "JNJ",
+          "price": 266.32,
+          "currency": "Market",
+          "shares": 15,
+          "commission": 1,
+          "note": ""
+        }
+      ],
+      "customAssets": [],
+      "goal": {
+        "startDate": "2023-01-03",
+        "years": 6,
+        "startValue": 30000,
+        "annualReturn": 8,
+        "contribution": 12000,
+        "contributionFreq": "Annually",
+        "growthRate": 3,
+        "growthFreq": "Year over Year"
+      },
+      "rebalance": {
+        "mode": "pct",
+        "targets": {},
+        "extraAssets": []
+      }
+    }
+  ]
+}

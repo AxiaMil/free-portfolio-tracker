@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6FA6FF"/><stop offset="0.5" stop-color="#3B7BF0"/><stop offset="1" stop-color="#1D4CC0"/></linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.26"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0.04"/></linearGradient>
+    <radialGradient id="shine" cx="0.25" cy="0.12" r="0.9"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/><stop offset="0.6" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="116" fill="url(#shine)"/>
+  <rect x="110" y="360" width="52" height="52" rx="14" fill="url(#area)"/><rect x="196" y="300" width="52" height="112" rx="14" fill="url(#area)"/><rect x="282" y="330" width="52" height="82" rx="14" fill="url(#area)"/><rect x="368" y="230" width="52" height="182" rx="14" fill="url(#area)"/>
+  <path d="M104 344 L196 252 L262 300 L404 160" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="404" cy="160" r="30" fill="#FFFFFF"/>
+</svg>

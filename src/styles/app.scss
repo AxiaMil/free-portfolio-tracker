@@ -1,0 +1,302 @@
+// Global look. Colours come from design tokens (CSS custom properties) set by src/theme.ts;
+// the :root values below are the default "Graphite" theme so the first paint is already correct.
+
+:root {
+  --bg: #0F1011;
+  --sidebar: #121314;
+  --surface: #17181A;
+  --surface-2: #1D1E21;
+  --surface-3: #28292D;
+  --border: #232427;
+  --border-strong: #333539;
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --text: #EDEDEC;
+  --text-2: #B2B2AE;
+  --muted: #85857F;
+  --faint: #55554F;
+  --primary: #4C8DFF;
+  --primary-fg: #FFFFFF;
+  --primary-soft: rgba(76, 141, 255, 0.14);
+  --primary-text: #8DB6FF;
+  --nav-active-bg: rgba(76, 141, 255, 0.12);
+  --nav-active-fg: #9CC0FF;
+  --pos: #34D399;
+  --neg: #F87171;
+  --pos-soft: rgba(52, 211, 153, 0.12);
+  --neg-soft: rgba(248, 113, 113, 0.12);
+  --warn: #FBBF24;
+  --pill-bg: #1A1B1D;
+  --pill-active: #2C2E32;
+  --hover: rgba(255, 255, 255, 0.04);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px rgba(0, 0, 0, 0.3);
+  --glow: none;
+  --heat-pos: 52, 211, 153;
+  --heat-neg: 248, 113, 113;
+  --tooltip-bg: #2C2E32;
+  --tooltip-fg: #EDEDEC;
+  --scrim: rgba(6, 6, 7, 0.6);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Geist Variable', 'Geist', system-ui, sans-serif;
+  --mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+.v-application {
+  font-family: var(--font) !important;
+  background: var(--glow), var(--bg) !important;
+  background-repeat: no-repeat !important;
+  color: var(--text) !important;
+  font-variant-numeric: tabular-nums;
+}
+.v-application .text-h1, .v-application .text-h2, .v-application .text-h3, .v-application .text-h4,
+.v-application .text-h5, .v-application .text-h6, .v-application .text-body-1, .v-application .text-body-2,
+.v-application .text-caption, .v-application .text-subtitle-1, .v-application .text-subtitle-2, .v-btn {
+  font-family: var(--font) !important;
+}
+
+::selection { background: var(--primary-soft); }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+
+.pos { color: var(--pos) !important; }
+.neg { color: var(--neg) !important; }
+.muted { color: var(--muted) !important; }
+.text-2 { color: var(--text-2) !important; }
+.mono { font-family: var(--mono) !important; }
+.nowrap { white-space: nowrap; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+// page container: content column is 1084px wide on a 1512px screen
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 74px 8px 64px;
+}
+@media (max-width: 959px) { .page { padding: 8px 12px 96px; } }
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.1px;
+  color: var(--text);
+  margin: 0;
+}
+
+// segmented control (Value | Return | Gain ...)
+.pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+  .pill {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: 500 13px/19.5px var(--font);
+    padding: 6px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    &:hover:not(.active):not(:disabled) { color: var(--text); }
+    &.active { background: var(--pill-active); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), inset 0 0 0 1px var(--line-soft); }
+    &:disabled { opacity: 0.35; cursor: default; }
+  }
+  &.sm .pill { font-size: 12px; padding: 4px 11px; }
+}
+@media (max-width: 959px) {
+  .pill-group { padding: 3px; .pill { font-size: 12px; line-height: 18px; padding: 4px 11px; } }
+}
+
+// outlined action button (Share, Edit Plan, Total Return, Rebalance)
+.outline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: 600 13.5px/1 var(--font);
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  .v-icon { color: var(--text-2); }
+  &:hover { background: var(--surface-2); border-color: var(--faint); }
+  &.icon { width: 40px; padding: 0; justify-content: center; }
+  &.sm { height: 30px; font-size: 12px; padding: 0 12px; }
+}
+
+// round icon buttons in the top bar
+.round-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  .v-icon { color: inherit; }
+  &:hover { background: var(--surface-2); color: var(--text); border-color: var(--faint); }
+  &.primary { background: var(--primary); border-color: transparent; color: var(--primary-fg); box-shadow: 0 6px 18px var(--primary-soft); &:hover { filter: brightness(1.08); } }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+// a section wrapped in a surface (charts and tables on every page)
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+@media (max-width: 959px) { .panel { padding: 14px; border-radius: 14px; } }
+
+.zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+  .z {
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    font: 600 12.5px/1 var(--font);
+    padding: 6px 9px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    &:hover:not(:disabled):not(.active) { background: var(--hover); color: var(--text); }
+    &.active { background: var(--pill-active); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-soft); }
+    &:disabled { color: var(--faint); cursor: default; }
+  }
+}
+
+// data tables
+.p-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  color: var(--text);
+  th {
+    text-align: left;
+    font-weight: 500;
+    font-size: 11.5px;
+    letter-spacing: 0.2px;
+    color: var(--muted);
+    height: 42px;
+    padding: 4px 4px 4px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    height: 46px;
+    padding: 4px 4px 4px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    line-height: 21px;
+  }
+  tbody tr { transition: background-color 0.12s ease; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--hover); }
+}
+
+.watermark {
+  position: absolute;
+  right: 10px;
+  bottom: 4px;
+  font-size: 11px;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.hide-scroll { scrollbar-width: none; }
+.hide-scroll::-webkit-scrollbar { display: none; }
+
+// thin, quiet scrollbars
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+// Lucide icons drawn inside .v-icon (see src/plugins/icons.ts)
+.v-icon.app-icon svg { display: block; width: 100%; height: 100%; }
+
+// ---------- Vuetify overrides ----------
+.v-navigation-drawer { background: var(--sidebar) !important; border-color: var(--border) !important; }
+.v-overlay__scrim { background: var(--scrim) !important; opacity: 1 !important; }
+.v-overlay__content > .v-card,
+.v-dialog > .v-overlay__content > .v-card {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35) !important;
+}
+.v-menu > .v-overlay__content > .v-list,
+.v-menu > .v-overlay__content > .v-card,
+.v-select__content > .v-list,
+.v-autocomplete__content > .v-list,
+.v-combobox__content > .v-list {
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3) !important;
+  padding: 4px !important;
+}
+.v-list-item { border-radius: 8px !important; }
+.v-list-item--active > .v-list-item__overlay { background: var(--primary) !important; opacity: 0.12 !important; }
+.v-field { color: var(--text) !important; }
+.v-field--variant-outlined .v-field__outline { --v-field-border-opacity: 1; color: var(--border-strong); }
+.v-field--variant-outlined.v-field--focused .v-field__outline { color: var(--primary); }
+.v-field--variant-outlined { background: var(--surface); }
+.v-label { color: var(--muted) !important; opacity: 1 !important; }
+.v-tooltip > .v-overlay__content {
+  background: var(--tooltip-bg) !important;
+  color: var(--tooltip-fg) !important;
+  font-size: 12.5px;
+  line-height: 1.45;
+  max-width: 320px;
+  padding: 7px 10px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.v-snackbar__wrapper { background: var(--tooltip-bg) !important; color: var(--tooltip-fg) !important; border-radius: 12px !important; }
+.v-expansion-panel { background: var(--surface-2) !important; color: var(--text) !important; }
+.v-date-picker { background: var(--surface) !important; color: var(--text) !important; }
