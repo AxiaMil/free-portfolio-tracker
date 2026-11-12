@@ -76,6 +76,8 @@ The repository contains the finished space. Build it by copying, not by designin
 - Copy app/portfolio-tracker.js byte for byte to client/src/portfolio-tracker.js. It is the
   whole app in one prebuilt, tested file and loads nothing else. It never builds code from a
   string (no eval or Function()), so it passes the publishing check as it is: never patch it.
+  At start-up it keeps the space's style checker (__tunnel) for page elements only, so its
+  chart labels draw correctly. That is intended: leave it.
 - Connect only the two lines that depend on this space's starter, and change nothing else:
   client/src/host.ts imports callAction(name, input) from the starter's server-action client,
   and server/src/actions.ts imports db from the starter's Drizzle database.
@@ -96,7 +98,8 @@ query2.finance.yahoo.com only. No other database, no login, no API keys.
 
 When it is ready, run refreshMarketCache once, then check: Home shows 0.00 with an empty
 chart; the + button opens "Manage Transaction"; adding "Buy AAPL, 10 shares" shows a value
-within a few seconds; Home's "Last Updated" line shows the user's local time and time zone
+within a few seconds; Allocation's donut labels (such as AAPL and its share) are then plain
+text, with no box behind them; Home's "Last Updated" line shows the user's local time and time zone
 (such as GMT+8 in Singapore); Settings -> Data & Backup says "Muse space storage"; reloading
 the space keeps the transaction.
 ```
@@ -142,6 +145,8 @@ lists it, with app/portfolio-tracker.js copied byte for byte to client/src/.
 - Times show in the user's local time zone, from their device. Do not set or force a time zone.
 - The current app file builds no code from strings (no eval or Function()), so it passes the
   publishing check as it is. Never patch it.
+- At start-up the app keeps the space's style checker (__tunnel) for page elements only, so
+  its chart labels draw correctly. That is intended: leave it.
 Do not change the app or add anything around it.
 ```
 
@@ -289,6 +294,10 @@ A brand-new space has no prices saved yet, so the first open downloads them and 
 ### It says "Your portfolio couldn't be loaded".
 
 Tap **Try again**. Your portfolio is safe: the app never saves over it when it can't read it. On a phone, Muse sometimes needs a few seconds to connect when you first open the space. The tracker already tries again several times on its own, so this screen is rare.
+
+### Chart labels show as solid boxes, or a chart is missing.
+
+Your space has a copy from before 13 November 2026. Update it with the prompt in [Made your space with an earlier version?](#step-3-add-your-investments). Your portfolio is kept.
 
 ### A ticker can't be found.
 

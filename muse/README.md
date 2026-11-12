@@ -32,7 +32,11 @@ Two lines connect to the Spaces starter's own modules, and nothing else depends 
 3. **While closed.** `refreshMarketCache` runs every 10 minutes and refreshes the snapshot: history, quotes and profiles for the active portfolio. A failed fetch never removes the last good data.
 4. **Saving.** Every change saves the whole portfolio as one JSON document under `portfolio` (`savePortfolio`), about 350 ms after the change.
 
-The page loads one script, so there's nothing to unpack and no blob URLs. The script never builds code from a string (no `eval` or `Function()`), so it passes Muse's publishing check as it is and never needs patching. In documents that refuse `history.pushState`, the app falls back to `#hash` navigation. If it can't start, or can't read the saved portfolio, it says so with a **Try again** button instead of a blank page. It never starts empty over existing data.
+The page loads one script, so there's nothing to unpack and no blob URLs. The script never builds code from a string (no `eval` or `Function()`), so it passes Muse's publishing check as it is and never needs patching.
+
+Muse's builder rewrites every `x.style` in the script so that style changes go through its own checker (`__tunnel.getStyle` / `setStyle`), which turns every value into text and "none" (`null`) into `''`. That is right for page elements, but the chart library keeps each shape's colours and sizes in a plain object that is also called `style`. Unchecked, label backgrounds and label lines were filled in a stray colour, and some charts didn't draw. The app's first module, [`src/platform/style-tunnel.ts`](../src/platform/style-tunnel.ts), passes only page elements to Muse's checker and lets every other object keep its own `style`. Outside Muse it does nothing.
+
+In documents that refuse `history.pushState`, the app falls back to `#hash` navigation. If it can't start, or can't read the saved portfolio, it says so with a **Try again** button instead of a blank page. It never starts empty over existing data.
 
 On phones, the bottom navigation and full-screen dialogs keep clear of the phone's home bar and notch. Times, such as Home's *Last Updated*, show in the device's own time zone.
 
@@ -41,4 +45,5 @@ On phones, the bottom navigation and full-screen dialogs keep clear of the phone
 `npm test` from the repository root (Node 23.6 or newer) covers this folder with plain Node and no network:
 - `server/src/market.ts`, against a fixed fake Yahoo: the allow-list, the scheduled refresh, the snapshot, and a round trip into the app (what the refresh stores is what the app opens on).
 - `client/src/host.ts`, with a fake in place of the starter's `./api`: the retried first load, and a failed load that throws instead of returning an empty portfolio.
+- `src/platform/style-tunnel.ts`, against a copy of Muse's style checker: chart shapes keep their own values, and page elements still go through Muse.
 - `app/portfolio-tracker.js`, the file the space copies: it must build no code from strings.

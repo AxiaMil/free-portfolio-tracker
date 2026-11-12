@@ -8,6 +8,7 @@
       "byte for byte: never edit, rebuild, minify, split, unpack, restyle, translate or port it",
       "it is the whole front end, full screen; it mounts itself into #app and loads no other file",
       "it never builds code from a string (no eval or Function()), so it passes the publishing check unchanged: never patch it",
+      "at start-up it keeps the space's style checker (__tunnel) for page elements only, so the chart library's own style objects keep their values and chart labels draw correctly: this is intended, leave it",
       "nothing is added to the interface: no header, title bar, avatar, navigation labels, banner, tips or notes",
       "no sample data: a new space starts empty"
     ]
@@ -53,6 +54,7 @@
     "Home shows 0.00 with an empty chart",
     "the + button opens \"Manage Transaction\"",
     "adding \"Buy AAPL, 10 shares\" shows a value within a few seconds",
+    "the Allocation page's donut labels (such as AAPL and its share) are then plain text, with no box behind them",
     "Home's \"Last Updated\" line shows the user's local time and time zone (such as GMT+8 in Singapore), never forced to UTC",
     "Settings → Data & Backup → Where it is saved says \"Muse space storage\"",
     "reloading the space keeps the transaction",

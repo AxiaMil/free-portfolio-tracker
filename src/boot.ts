@@ -1,6 +1,7 @@
 // Starts the app in a page element. Shared by the regular build (main.ts, index.html) and the one-file build
 // (single.ts, app/portfolio-tracker.js).
-import './platform/history.ts'; // first: the router uses history as soon as it is created
+import './platform/style-tunnel.ts'; // first of all: in a Muse space, charts need plain `style` objects (see the file)
+import './platform/history.ts'; // before the router, which uses history as soon as it is created
 import { createApp } from 'vue';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';

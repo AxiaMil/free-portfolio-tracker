@@ -14,7 +14,7 @@ This page is for people who want to know how the tracker works inside, or who wa
 
 A Muse space runs a front end, server actions, its own storage and scheduled jobs. It can't run a Node server, listen on a port or use files on disk. The tracker is built around that, in two parts:
 
-- **The app:** [`app/portfolio-tracker.js`](../app/portfolio-tracker.js). It holds the whole app (code, styles and fonts) in one prebuilt file of about 690 KB compressed. It loads nothing else, so Muse has nothing to unpack, rebuild or rewrite.
+- **The app:** [`app/portfolio-tracker.js`](../app/portfolio-tracker.js). It holds the whole app (code, styles and fonts) in one prebuilt file of about 690 KB compressed. It loads nothing else, so Muse has nothing to unpack or rebuild. Muse does rewrite every `x.style` in it to go through its own style checker. The app's first module, [`src/platform/style-tunnel.ts`](../src/platform/style-tunnel.ts), keeps that checker to page elements so the charts' own shape styles stay intact ([details](../muse/README.md#how-it-works)).
 - **The space around it:** [`muse/`](../muse). It holds the page, a 30-line bridge, two storage tables, six server actions and the 10-minute refresh, listed for Muse in [`muse/manifest.json`](../muse/manifest.json).
 
 | Part of the space | What it does |
@@ -133,7 +133,8 @@ npm run dev
 ├── src/
 │   ├── engine/        Pure TypeScript portfolio engine (ledger, lots, returns, risk, dividends, goals, trades)
 │   ├── market/        Yahoo Finance client: request limits, retries, device cache, the space's snapshot
-│   ├── platform/      Where data is saved: the space's storage (host bridge) or the browser, automatic snapshots
+│   ├── platform/      Where data is saved: the space's storage (host bridge) or the browser, automatic snapshots,
+│                      and the repair for Muse's style rewrite
 │   ├── pages/         One page per route
 │   ├── components/    Charts, tables, dialogs and per-page components
 │   ├── composables/   Shared derived stats and UI behaviour
@@ -142,7 +143,7 @@ npm run dev
 │   ├── theme.ts       Design tokens and chart colours for each theme
 │   ├── store.ts       App state, market-data loading and auto refresh
 │   └── format.ts      Money / percentage formatting
-├── tests/             Engine, Muse server, Muse bridge and build-output tests (npm test)
+├── tests/             Engine, Muse server, Muse bridge, Muse style checker and build-output tests (npm test)
 ├── public/
 │   └── host.js        Host bridge template for running app/ outside Muse
 └── docs/

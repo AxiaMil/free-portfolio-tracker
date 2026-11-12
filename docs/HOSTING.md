@@ -113,7 +113,9 @@ A Muse space can run a front end plus server actions, with its own storage and s
 | `loadMarketCache` / `saveMarketCache` | `getSnapshot` / `saveSnapshotEntries` on the `market_cache` table |
 | A snapshot fresh while the app is closed | `refreshMarketCache` every 10 minutes ([`muse/space.json`](../muse/space.json)) |
 
-The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on. `npm test` also covers the bridge's retried load and checks that `app/portfolio-tracker.js` builds no code from strings, which Muse's publishing check refuses.
+The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on. `npm test` also covers the bridge's retried load and the style repair below, and checks that `app/portfolio-tracker.js` builds no code from strings, which Muse's publishing check refuses.
+
+Muse's builder also rewrites every `x.style` in the space's code, the chart library's included, to go through its style checker (`__tunnel`), which turns every value into text. The chart library keeps each shape's colours in plain objects called `style`, so the app's first module, [`src/platform/style-tunnel.ts`](../src/platform/style-tunnel.ts), sends only page elements to the checker. Without it, chart labels show as solid boxes and some charts don't draw. A host that rewrites code the same way needs nothing more; elsewhere the module does nothing.
 
 These were tested end to end at phone and laptop widths, with the one file loaded from a `blob:` URL on a page that had no `#app` element and no viewport tag. Every server-action call took 250 ms:
 - **Opening:** a new device opened on the host's market snapshot in about 0.5 s, with no live request before the first paint. A device with its own cache opened in about 0.3 s. With no snapshot and no cache, the first open took about 2 s, with a count.
@@ -122,6 +124,7 @@ These were tested end to end at phone and laptop widths, with the one file loade
 - **History:** navigation, including Back, kept working in a document that refuses `history.pushState`.
 - **Load failure:** an unreadable saved portfolio showed **Try again**, and nothing was saved over it.
 - **Every page and dialog** was checked at 360, 390, 768 and 1512 px wide, both empty and with data.
+- **Muse's style rewrite:** every page was also run from the one file with Muse's `x.style` rewrite applied and a copy of its checker in front, at 390 and 1300 px wide. No chart shape reached the checker, and every chart drew with a clean console.
 - **Other builds:** the multi-file `app/` folder was tested the same way. Without a bridge, the app still works fully on browser storage, and shows prices as offline until a route exists.
 
 The UI already fits Muse's phone view:
