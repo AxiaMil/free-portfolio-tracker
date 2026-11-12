@@ -2,7 +2,7 @@
 import { palette, alpha } from '../../theme.ts';
 // Price history of one custom asset: step chart (prices carry forward until the next point) + editable table.
 import { computed, ref, watch } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { store, toast } from '../../store.ts';
 import type { CustomAsset } from '../../engine/types.ts';
 import { AXIS_COLOR, FONT, GRID_COLOR, tooltipBase } from '../../charts.ts';

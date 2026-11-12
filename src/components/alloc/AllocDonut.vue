@@ -3,7 +3,7 @@ import { palette, alpha } from '../../theme.ts';
 // Donut with callout labels ("VOO: 18.9%") that sizes and shifts itself so the labels fit beside it
 // (labels on the wide side push the ring over).
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { FONT, tooltipBase } from '../../charts.ts';
 import { money } from '../../format.ts';
 

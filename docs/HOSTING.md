@@ -17,7 +17,7 @@ Both are switched through one optional object, `window.portfolioHost`. Define it
 
 ## The one-file build
 
-Some platforms take a front end as a single script rather than a folder of files. For them, `npm run build:app` also writes [`app/portfolio-tracker.js`](../app/portfolio-tracker.js): the whole app (code, styles and the Geist fonts as data URLs) in one classic script of about 2.2 MB, 690 KB compressed. It requests no other file, so it works the same whether it is served from a folder, embedded in another bundle or loaded from a `blob:` URL.
+Some platforms take a front end as a single script rather than a folder of files. For them, `npm run build:app` also writes [`app/portfolio-tracker.js`](../app/portfolio-tracker.js): the whole app (code, styles and the Geist fonts as data URLs) in one classic script of about 2.2 MB, 690 KB compressed. It requests no other file, so it works the same whether it is served from a folder, embedded in another bundle or loaded from a `blob:` URL. It never builds code from a string (no `eval` or `Function()`), so it also runs on hosts that refuse that, such as Meta Muse's publishing check or a Content-Security-Policy without `'unsafe-eval'`. The build fails if that changes, and `npm test` checks the committed files.
 
 Any page can run it, in `<head>` or `<body>`. When the page has no `<div id="app">` it adds one at the end of `<body>`, and it adds a viewport tag if there is none. Define `window.portfolioHost` before it:
 

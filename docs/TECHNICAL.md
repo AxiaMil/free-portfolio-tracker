@@ -113,7 +113,7 @@ npm run dev
 | Command | What it does |
 |---|---|
 | `npm run dev` | Starts the development server, with hot reload |
-| `npm test` | Runs the engine, Muse server and Muse bridge tests (no network needed) |
+| `npm test` | Runs the engine, Muse server and Muse bridge tests, and checks the built app (no network needed) |
 | `npm run build:app` | Rebuilds `app/`, including `app/portfolio-tracker.js`, the file Muse copies. Run it before committing any app change |
 | `npm run build` | Builds the static app into `dist/` |
 | `npm run preview` | Serves the last build locally, to check it before release |
@@ -140,7 +140,7 @@ npm run dev
 │   ├── theme.ts       Design tokens and chart colours for each theme
 │   ├── store.ts       App state, market-data loading and auto refresh
 │   └── format.ts      Money / percentage formatting
-├── tests/             Engine, Muse server and Muse bridge tests (npm test)
+├── tests/             Engine, Muse server, Muse bridge and build-output tests (npm test)
 ├── public/
 │   └── host.js        Host bridge template for running app/ outside Muse
 └── docs/

@@ -40,6 +40,9 @@ const SINGLE_HTML = `<!doctype html>
 </html>
 `;
 
+/** `new Function(…)`, `Function("…")` or `eval(…)`; tests/build-output.test.ts checks the built files the same way */
+const CODE_FROM_STRING = /\bnew\s+Function\s*\(|(?<![\w$.])Function\s*\(\s*["'`]|(?<![\w$.])eval\s*\(/;
+
 /**
  * One-file build: puts the stylesheet (fonts already inlined as data URLs) inside the script, which adds it to the
  * page before the app starts, and writes a small page that loads it. Nothing is left to fetch or unpack.
@@ -65,6 +68,9 @@ function oneFile(): Plugin {
         if (!js || js.type !== 'chunk') this.error(`one-file build: ${SINGLE_JS} missing`);
         const style = `(function(){var s=document.createElement("style");s.setAttribute("data-app","portfolio-tracker");s.textContent=${JSON.stringify(css.join('\n'))};(document.head||document.documentElement).appendChild(s)})();\n`;
         js.code = `/*! Portfolio Tracker, one-file build. MIT licence. https://github.com/AxiaMil/portfolio-tracker */\n${style}${js.code}`;
+        // Meta Muse refuses to publish a script that builds code from a string, so the file Muse copies must have none
+        const evalLike = js.code.match(CODE_FROM_STRING);
+        if (evalLike) this.error(`one-file build contains code built from a string (${evalLike[0]}), which Meta Muse refuses`);
         this.emitFile({ type: 'asset', fileName: 'portfolio-tracker.html', source: SINGLE_HTML });
       },
     },

@@ -306,6 +306,8 @@ function choose(id: string) {
 .sep { color: var(--muted); }
 .actions { display: flex; justify-content: flex-end; gap: 16px; padding: 0 4px 4px; }
 @media (max-width: 959px) {
+  // full screen: keep the header clear of the status bar and the buttons clear of the home bar
+  .atd { padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
   .rows-wrap { min-height: 0; }
   .bar { padding: 10px 16px; .pname { font-size: 18px; width: 100%; } }
   .div { display: none; }

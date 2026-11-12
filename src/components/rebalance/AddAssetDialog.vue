@@ -104,7 +104,7 @@ function onEnter() {
 <style scoped lang="scss">
 .add-card { padding: 18px 20px 14px; border-radius: 16px !important; }
 // full screen on phones: square corners, the field keeps its height and the results take the rest
-.add-card.full { border-radius: 0 !important; .results { flex: 1 1 auto; max-height: none; } }
+.add-card.full { border-radius: 0 !important; padding-top: calc(18px + var(--safe-top)); padding-bottom: calc(14px + var(--safe-bottom));.results { flex: 1 1 auto; max-height: none; } }
 .q { flex: 0 0 auto; }
 .hd { display: flex; align-items: center; }
 .t { font-size: 18px; font-weight: 700; }

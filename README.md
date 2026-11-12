@@ -74,7 +74,8 @@ The repository contains the finished space. Build it by copying, not by designin
   muse/client/src/main.ts and host.ts -> client/src/,
   muse/server/src/actions.ts, market.ts and schema.ts -> server/src/.
 - Copy app/portfolio-tracker.js byte for byte to client/src/portfolio-tracker.js. It is the
-  whole app in one prebuilt, tested file and loads nothing else.
+  whole app in one prebuilt, tested file and loads nothing else. It never builds code from a
+  string (no eval or Function()), so it passes the publishing check as it is: never patch it.
 - Connect only the two lines that depend on this space's starter, and change nothing else:
   client/src/host.ts imports callAction(name, input) from the starter's server-action client,
   and server/src/actions.ts imports db from the starter's Drizzle database.
@@ -84,6 +85,9 @@ Do not edit, rebuild, minify, split, unpack, restyle, translate, re-implement or
 Do not add anything to the interface: no header, title bar, avatar, labels under the
 navigation icons, banner, tips or notes. Do not add sample data: the app starts empty.
 
+Time: the app shows every time in the user's local time zone, taken from their device. Do not
+set, force or convert a time zone anywhere in the space (never force UTC).
+
 Storage: the two tables in server/src/schema.ts. app_state holds the whole portfolio as one
 JSON document under the key "portfolio"; market_cache holds the market snapshot.
 Server actions: the six in server/src/actions.ts. Scheduled job: refreshMarketCache every
@@ -92,8 +96,9 @@ query2.finance.yahoo.com only. No other database, no login, no API keys.
 
 When it is ready, run refreshMarketCache once, then check: Home shows 0.00 with an empty
 chart; the + button opens "Manage Transaction"; adding "Buy AAPL, 10 shares" shows a value
-within a few seconds; Settings -> Data & Backup says "Muse space storage"; reloading the space
-keeps the transaction.
+within a few seconds; Home's "Last Updated" line shows the user's local time and time zone
+(such as GMT+8 in Singapore); Settings -> Data & Backup says "Muse space storage"; reloading
+the space keeps the transaction.
 ```
 
 ### Step 2: Say yes to Yahoo Finance
@@ -134,6 +139,9 @@ lists it, with app/portfolio-tracker.js copied byte for byte to client/src/.
   does the caching, request limits, retries and snapshot loading itself.
 - Replace the server actions with server/src/actions.ts and market.ts. Keep the 10-minute
   refreshMarketCache job.
+- Times show in the user's local time zone, from their device. Do not set or force a time zone.
+- The current app file builds no code from strings (no eval or Function()), so it passes the
+  publishing check as it is. Never patch it.
 Do not change the app or add anything around it.
 ```
 

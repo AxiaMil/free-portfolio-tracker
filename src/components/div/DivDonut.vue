@@ -3,7 +3,7 @@ import { palette, alpha } from '../../theme.ts';
 // Donut for the Dividends page: like the shared DonutChart, but slivers under ~1% get no callout
 // label (they stay visible and in the tooltip), which keeps the left side readable.
 import { computed, ref } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { FONT, PALETTE, tooltipBase } from '../../charts.ts';
 import { money } from '../../format.ts';
 

@@ -3,7 +3,7 @@ import { palette, alpha } from '../../theme.ts';
 // Stacked bars of received vs upcoming dividends per month / quarter / year, with a scroll bar
 // and a tooltip that breaks the bar down by ticker.
 import { computed, ref } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { useDisplay } from 'vuetify';
 import { AXIS_COLOR, FONT, GRID_COLOR, tooltipBase } from '../../charts.ts';
 import type { DivBucket } from '../../engine/dividends.ts';

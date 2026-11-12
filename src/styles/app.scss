@@ -2,6 +2,12 @@
 // the :root values below are the default "Graphite" theme so the first paint is already correct.
 
 :root {
+  // phones: the height of the bottom navigation's icon row, and the room kept clear above the phone's home bar or
+  // gesture bar (by the navigation and by full-screen dialogs). The room is at least 8px, for shells that draw
+  // under that bar without reporting it as a safe area.
+  --bottom-nav-h: 64px;
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  --safe-top: env(safe-area-inset-top, 0px);
   --bg: #0F1011;
   --sidebar: #121314;
   --surface: #17181A;
@@ -83,7 +89,8 @@ body {
   margin: 0 auto;
   padding: 74px 8px 64px;
 }
-@media (max-width: 959px) { .page { padding: 12px 12px 168px; } }
+// phone: the end of a page can scroll clear of the bottom navigation and the floating buttons above it
+@media (max-width: 959px) { .page { padding: 12px 12px calc(var(--bottom-nav-h) + var(--safe-bottom) + 112px); } }
 
 .section-title {
   font-family: var(--font-display);

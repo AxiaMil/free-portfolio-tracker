@@ -2,7 +2,7 @@
 import { palette, alpha } from '../../theme.ts';
 // "Activity & Costs": buys vs sells per period (count, value or fees) and the per-period cost/turnover table.
 import { computed, ref } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { useDisplay } from 'vuetify';
 import { result } from '../../store.ts';
 import { tradeActivity, type ActivityRow, type Bucket } from '../../engine/trades.ts';

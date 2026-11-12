@@ -3,7 +3,7 @@ import { palette, alpha } from '../../theme.ts';
 // Price line with buy/sell flags (stacked when several trades share a day), zoom buttons and a navigator.
 // Same look as TimeChart; separate because flags need per-flag colours, stacking offsets and trade tooltips.
 import { computed, ref, watch } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { useDisplay } from 'vuetify';
 import { AXIS_COLOR, FONT, tooltipBase } from '../../charts.ts';
 import { addMonths, addYears, toDate } from '../../engine/util.ts';

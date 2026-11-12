@@ -125,7 +125,7 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
     <!-- mobile bottom navigation -->
     <nav v-if="!mdAndUp" class="bottom-nav" :class="{ away: barsHidden }" :inert="barsHidden || undefined">
       <router-link v-for="t in MOBILE_TABS" :key="t.to" :to="t.to" class="bn-item" :class="{ active: isActive(t.to) }">
-        <v-icon size="22">{{ t.icon }}</v-icon>
+        <v-icon size="24">{{ t.icon }}</v-icon>
       </router-link>
     </nav>
 
@@ -236,8 +236,8 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
 $ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 .bottom-nav, .fabs { transition: transform 240ms $ease-drawer, opacity 240ms $ease-drawer; }
 .bottom-nav.away { transform: translateY(100%); }
-// the buttons sit 72px above the screen edge (nav + gap), so move them their own height plus that
-.fabs.away { transform: translateY(calc(100% + 72px + env(safe-area-inset-bottom))); }
+// the buttons sit 16px above the navigation, so move them their own height plus that
+.fabs.away { transform: translateY(calc(100% + var(--bottom-nav-h) + var(--safe-bottom) + 16px)); }
 @media (prefers-reduced-motion: reduce) {
   // no sliding: they simply fade out and back in
   .bottom-nav, .fabs { transition: opacity 150ms ease; }
@@ -247,7 +247,7 @@ $ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 .fabs {
   position: fixed;
   right: 16px;
-  bottom: calc(56px + 16px + env(safe-area-inset-bottom));
+  bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 16px);
   z-index: 1006;
   display: flex;
   flex-direction: column;
@@ -267,7 +267,7 @@ $ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   &.main { width: 56px; height: 56px; border: 0; background: var(--primary); color: var(--primary-fg); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35), 0 4px 14px var(--primary-soft); }
   &.mini { width: 44px; height: 44px; border: 1px solid var(--border-strong); background: color-mix(in srgb, var(--surface-2) 92%, transparent); color: var(--text-2); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 }
-.snack-up :deep(.v-snackbar__wrapper) { margin-bottom: calc(68px + env(safe-area-inset-bottom)); }
+.snack-up :deep(.v-snackbar__wrapper) { margin-bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 12px); }
 .loading { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .load-count { margin-top: 4px; font-size: 12.5px; }
 .fail { gap: 10px; padding: 0 24px; text-align: center; }
@@ -281,8 +281,9 @@ $ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   z-index: 1006;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  height: 56px;
-  padding-bottom: env(safe-area-inset-bottom);
+  // border-box: the height covers the icon row and the room for the phone's home bar, so add the two
+  height: calc(var(--bottom-nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);

@@ -5,6 +5,7 @@ import { useDisplay } from 'vuetify';
 import { store, result, benchName, activePortfolio } from '../store.ts';
 import { headline, keyStats, gainsAndReturns, HEADER_PERIODS } from '../composables/stats.ts';
 import { money, num, pct, signClass, ccySymbol } from '../format.ts';
+import { localTimestamp } from '../engine/util.ts';
 import HelpTip from './HelpTip.vue';
 
 const { mdAndUp } = useDisplay();
@@ -21,10 +22,8 @@ const big = computed(() => {
   const v = h.value?.value ?? 0;
   return num(v, wholeAbove1k(v));
 });
-const lastUpdated = computed(() => {
-  if (!store.lastUpdated) return '';
-  return new Date(store.lastUpdated).toISOString().replace('T', ' ').replace('Z', '') + ' GMT';
-});
+// in the device's own time zone, named: "2026-11-12 15:27:02.413 GMT+8"
+const lastUpdated = computed(() => (store.lastUpdated ? localTimestamp(store.lastUpdated) : ''));
 const pnlRows = computed(() => {
   const p = result.value?.pnl;
   if (!p) return [];
@@ -181,7 +180,7 @@ function togglePrivacy() {
 .rows { display: flex; flex-direction: column; gap: 3px; margin-top: -8px; }
 .panel.m .rows { margin-top: 0; gap: 8px; }
 .row { display: flex; justify-content: space-between; gap: 20px; font-size: 13px; line-height: 18px; color: var(--text-2); span:last-child { color: var(--text); font-weight: 500; } }
-.sheet { background: var(--surface) !important; padding-bottom: 24px; }
+.sheet { background: var(--surface) !important; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 .panel.m { padding: 16px; }
 @media (max-width: 959px) {
   .ph { padding-top: 0; }

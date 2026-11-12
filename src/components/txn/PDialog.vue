@@ -26,7 +26,8 @@ const { mdAndUp } = useDisplay();
 
 <style scoped lang="scss">
 .pdlg { background: var(--surface-2) !important; border-radius: 12px !important; color: var(--text); }
-.pdlg.full { border-radius: 0 !important; }
+// full screen on phones: the header clear of the status bar, the buttons clear of the home bar
+.pdlg.full { border-radius: 0 !important; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
 .pd-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px 14px 24px; border-bottom: 1px solid var(--border); }
 .pd-titles { flex: 1; min-width: 0; }
 .pd-step { color: var(--primary-text); font-weight: 700; font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase; }

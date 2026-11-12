@@ -2,7 +2,7 @@
 import { palette, alpha } from '../theme.ts';
 // Donut with callout labels such as "AAPL: 33.2%".
 import { computed, ref } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { PALETTE, FONT, tooltipBase } from '../charts.ts';
 import { money } from '../format.ts';
 

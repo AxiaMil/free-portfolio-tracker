@@ -39,6 +39,25 @@ export function todayLocal(): string {
   return `${y}-${m}-${dd}`;
 }
 
+/** a moment in the device's own time zone, with the zone's name: "2026-11-12 15:27:02.413 GMT+8" in Singapore,
+ *  "2026-11-12 02:27:02.413 EST" in New York */
+export function localTimestamp(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number, w = 2) => String(n).padStart(w, '0');
+  const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+  return `${stamp} ${zoneName(d)}`;
+}
+
+function zoneName(d: Date): string {
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(d).find((x) => x.type === 'timeZoneName')?.value;
+    if (name) return name;
+  } catch { /* fall back to the offset */ }
+  const off = -d.getTimezoneOffset();
+  const h = Math.floor(Math.abs(off) / 60), m = Math.abs(off) % 60;
+  return off === 0 ? 'GMT' : `GMT${off > 0 ? '+' : '-'}${h}${m ? `:${String(m).padStart(2, '0')}` : ''}`;
+}
+
 export function isWeekend(isoDate: string): boolean {
   const wd = toDate(isoDate).getUTCDay();
   return wd === 0 || wd === 6;

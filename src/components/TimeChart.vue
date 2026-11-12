@@ -2,7 +2,7 @@
 import { palette, alpha } from '../theme.ts';
 // Time series chart with zoom buttons, date range readout and a navigator strip.
 import { computed, ref, watch } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { useDisplay } from 'vuetify';
 import { AXIS_COLOR, FONT, GRID_COLOR, tooltipBase } from '../charts.ts';
 import { addMonths, addYears, toDate } from '../engine/util.ts';

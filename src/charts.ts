@@ -1,4 +1,9 @@
 // ECharts registration (tree-shaken) + shared chart theme bits.
+//
+// Charts use vue-echarts' CSP build ('vue-echarts/csp'). The default build defines its <x-vue-echarts> element
+// through `new Function(...)`, which strict hosts refuse (Meta Muse won't publish a space whose script builds
+// code from a string). The CSP build skips that element and needs this one stylesheet instead.
+import 'vue-echarts/csp/style.css';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart, BarChart, PieChart, TreemapChart, ScatterChart } from 'echarts/charts';

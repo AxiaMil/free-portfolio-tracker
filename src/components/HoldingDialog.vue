@@ -81,6 +81,8 @@ const markers = computed(() => {
 
 <style scoped lang="scss">
 .hd { background: var(--surface) !important; border: 1px solid var(--border); border-radius: 16px !important; }
+// full screen on phones: the header clear of the status bar, the end of the content clear of the home bar
+@media (max-width: 959px) { .hd { padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); } }
 .hd-head { display: flex; align-items: flex-start; padding: 16px 20px 4px; gap: 10px; }
 .sym { font-size: 20px; font-weight: 700; line-height: 28px; }
 .name { font-size: 13px; font-weight: 400; margin-left: 6px; }

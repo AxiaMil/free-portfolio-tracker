@@ -2,7 +2,7 @@
 import { palette, alpha } from '../theme.ts';
 // "My Holdings" gain chart: grouping x metric x period, bar or treemap.
 import { computed, ref } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { useDisplay } from 'vuetify';
 import { result, marketView } from '../store.ts';
 import { periodBaseDate, type PeriodKey } from '../engine/periods.ts';

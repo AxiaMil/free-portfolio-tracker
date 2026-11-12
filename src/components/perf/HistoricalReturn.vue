@@ -2,7 +2,7 @@
 import { palette, alpha } from '../../theme.ts';
 // "Historical Return": per month / quarter / year bars vs the main benchmark, with a heat-coloured table below.
 import { computed, ref, watch } from 'vue';
-import VChart from 'vue-echarts';
+import VChart from 'vue-echarts/csp';
 import { useDisplay } from 'vuetify';
 import { benchName, result, store } from '../../store.ts';
 import { primaryBench } from '../../composables/stats.ts';
