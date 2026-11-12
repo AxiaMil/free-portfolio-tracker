@@ -7,7 +7,7 @@ Everything a [Meta Muse](https://about.fb.com/news/2026/11/introducing-spaces-cu
 | [`../app/portfolio-tracker.js`](../app/portfolio-tracker.js) | `client/src/portfolio-tracker.js` | The whole app in one prebuilt file. Copied byte for byte. |
 | [`client/index.html`](client/index.html) | `client/index.html` | The page: only `#app` and the entry script |
 | [`client/src/main.ts`](client/src/main.ts) | `client/src/main.ts` | Connects the bridge, then runs the app |
-| [`client/src/host.ts`](client/src/host.ts) | `client/src/host.ts` | `window.portfolioHost`: storage and market data through the server actions |
+| [`client/src/host.ts`](client/src/host.ts) | `client/src/host.ts` | `window.portfolioHost`: storage and market data through the server actions. Retries the first portfolio load while a phone's bridge is still starting |
 | [`server/src/actions.ts`](server/src/actions.ts) | `server/src/actions.ts` | The six server actions |
 | [`server/src/market.ts`](server/src/market.ts) | `server/src/market.ts` | The yahooGet allow-list, the market snapshot and the scheduled refresh (no dependencies) |
 | [`server/src/schema.ts`](server/src/schema.ts) | `server/src/schema.ts` | Two Drizzle tables: `app_state` and `market_cache` |
@@ -20,6 +20,7 @@ Two lines connect to the Spaces starter's own modules, and nothing else depends 
 ## How it works
 
 1. **Opening.** The page defines `window.portfolioHost`, then runs the app. The app loads the portfolio (`getPortfolio`) and the market snapshot (`getSnapshot`) at the same time.
+   - On a phone, the first action call of a session can fail once while the phone's bridge is still starting. So the bridge retries a failed `getPortfolio` up to 4 times, after 0.7, 1.5, 3 and 5 seconds. If every try fails, it reports the error and never treats the failure as an empty portfolio.
    - When the device has its own cache, Home shows at once from it.
    - On a new device, Home shows from the snapshot, whatever its age.
    - Prices then update live through `yahooGet`.
@@ -31,8 +32,13 @@ Two lines connect to the Spaces starter's own modules, and nothing else depends 
 3. **While closed.** `refreshMarketCache` runs every 10 minutes and refreshes the snapshot: history, quotes and profiles for the active portfolio. A failed fetch never removes the last good data.
 4. **Saving.** Every change saves the whole portfolio as one JSON document under `portfolio` (`savePortfolio`), about 350 ms after the change.
 
-The page loads one script, so there's nothing to unpack and no blob URLs. In documents that refuse `history.pushState`, the app falls back to `#hash` navigation. If it can't start, or can't read the saved portfolio, it says so with a **Try again** button instead of a blank page. It never starts empty over existing data.
+The page loads one script, so there's nothing to unpack and no blob URLs. The script never builds code from a string (no `eval` or `Function()`), so it passes Muse's publishing check as it is and never needs patching. In documents that refuse `history.pushState`, the app falls back to `#hash` navigation. If it can't start, or can't read the saved portfolio, it says so with a **Try again** button instead of a blank page. It never starts empty over existing data.
 
-## Testing the server logic
+On phones, the bottom navigation and full-screen dialogs keep clear of the phone's home bar and notch. Times, such as Home's *Last Updated*, show in the device's own time zone.
 
-`server/src/market.ts` has no dependencies, so its tests run with plain Node: `npm test` from the repository root (Node 23.6 or newer). They use a fixed fake Yahoo, so they need no network.
+## Tests
+
+`npm test` from the repository root (Node 23.6 or newer) covers this folder with plain Node and no network:
+- `server/src/market.ts`, against a fixed fake Yahoo: the allow-list, the scheduled refresh, the snapshot, and a round trip into the app (what the refresh stores is what the app opens on).
+- `client/src/host.ts`, with a fake in place of the starter's `./api`: the retried first load, and a failed load that throws instead of returning an empty portfolio.
+- `app/portfolio-tracker.js`, the file the space copies: it must build no code from strings.

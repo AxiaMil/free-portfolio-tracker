@@ -27,14 +27,16 @@ A Muse space runs a front end, server actions, its own storage and scheduled job
 | `refreshMarketCache` | Every 10 minutes, open or not: refreshes the snapshot for your active portfolio |
 
 **What happens when you open it:**
-1. The app loads your portfolio and the snapshot at the same time.
+1. The app loads your portfolio and the snapshot at the same time. On a phone, the first call can fail once while the phone's bridge starts, so the space retries the portfolio load up to 4 times (after 0.7, 1.5, 3 and 5 seconds) before showing an error.
 2. It shows Home straight away from the prices cached on your device, or from the snapshot on a new device.
 3. It brings anything stale up to date in the background. It sends at most six requests at a time, never the same one twice at once, and retries a failed request once.
 4. While it's open, quotes refresh every minute and history every 10 minutes. The refresh button forces an update.
 
 Only a brand-new space whose snapshot has never been filled waits for prices, and it shows a count while it does. If the app can't start, or can't read your saved portfolio, it says so with a **Try again** button. It never starts empty over your data.
 
-The layout is made for Muse on a phone. There's no top bar. The bottom navigation, **+** and refresh float above the content and slide away while you scroll down. Help is under **Menu → Help & FAQ**. On a computer you get a sidebar and full-width pages.
+The layout is made for Muse on a phone. There's no top bar. The bottom navigation, **+** and refresh float above the content and slide away while you scroll down. They and full-screen dialogs keep clear of the phone's home bar and notch. Times show in your own time zone. Help is under **Menu → Help & FAQ**. On a computer you get a sidebar and full-width pages.
+
+The app file never builds code from a string (no `eval` or `Function()`), so it passes Muse's publishing check as it is. The build fails if that changes, and `npm test` checks the committed file.
 
 [`muse/README.md`](../muse/README.md) explains the space file by file, and [HOSTING.md](HOSTING.md) has the full bridge contract and what was tested.
 
@@ -153,4 +155,4 @@ The engine in `src/engine/` has no UI dependencies. It takes your transactions p
 
 ## Tech stack
 
-[Vue 3](https://vuejs.org) · [Vuetify 3](https://vuetifyjs.com) · [Vite](https://vite.dev) · [Apache ECharts](https://echarts.apache.org) via [vue-echarts](https://github.com/ecomfe/vue-echarts) · [Lucide](https://lucide.dev) icons · [Geist](https://vercel.com/font) font. In the space: Muse server actions, Drizzle on SQLite, and one scheduled job. Market data comes from Yahoo Finance's public endpoints.
+[Vue 3](https://vuejs.org) · [Vuetify 3](https://vuetifyjs.com) · [Vite](https://vite.dev) · [Apache ECharts](https://echarts.apache.org) via [vue-echarts](https://github.com/ecomfe/vue-echarts) (its CSP build) · [Lucide](https://lucide.dev) icons · [Geist](https://vercel.com/font) font. In the space: Muse server actions, Drizzle on SQLite, and one scheduled job. Market data comes from Yahoo Finance's public endpoints.

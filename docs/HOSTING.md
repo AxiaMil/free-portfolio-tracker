@@ -56,6 +56,8 @@ window.portfolioHost = {
 Every member is optional:
 
 - **`loadState` and `saveState`** must be defined together. The app then reads and writes only through them and never touches `localStorage`. The state is one JSON document, typically 10–200 KB. Its shape is `AppState` in [`src/engine/types.ts`](../src/engine/types.ts): `{ version, activePortfolioId, preferences, portfolios[] }`.
+  - `loadState` returns `null` only when nothing has been saved yet: the app then starts with one empty portfolio. When the read fails, it must throw. Never return `null` for a failure, or the empty start could be saved over the real portfolio.
+  - The app doesn't retry `loadState`, so retry inside the bridge if the host's first call can fail for a moment (the Muse bridge does, below).
 - **`fetchJson(url)`** is the first route the app tries for market data. It receives full `https://query1.finance.yahoo.com/…` or `https://query2.finance.yahoo.com/…` URLs. Return the parsed JSON (Yahoo answers errors as JSON too, so pass those through). Throw only when the request itself fails. The app retries a failed request once after 0.7 s. It then tries its other routes and, failing those, shows cached prices with the refresh button in amber.
 - **`loadMarketCache(since)`** lets a new device open at once, without waiting for market data. It returns raw Yahoo responses as `[{ key, data, fetchedAt }]` (or `{ entries }`).
   - Keys: `chart:<SYMBOL>` (the chart response), `spark:<SYM,SYM,…>` (a quote response for up to 20 symbols) and `search:<SYMBOL>` (the profile search response).
@@ -106,12 +108,12 @@ A Muse space can run a front end plus server actions, with its own storage and s
 | Tracker needs | In the space |
 |---|---|
 | The front end | `app/portfolio-tracker.js` copied byte for byte, run by a page that holds only `#app` |
-| `loadState` / `saveState` | `getPortfolio` / `savePortfolio`: one JSON document under `portfolio` in the `app_state` table |
+| `loadState` / `saveState` | `getPortfolio` / `savePortfolio`: one JSON document under `portfolio` in the `app_state` table. On a phone, the first call of a session can fail once while the phone's bridge starts, so [`muse/client/src/host.ts`](../muse/client/src/host.ts) retries a failed load after 0.7, 1.5, 3 and 5 s, then throws |
 | `fetchJson` | `yahooGet`: allow-listed to `query1.finance.yahoo.com` and `query2.finance.yahoo.com`, which Muse's Sentinel asks you to approve |
 | `loadMarketCache` / `saveMarketCache` | `getSnapshot` / `saveSnapshotEntries` on the `market_cache` table |
 | A snapshot fresh while the app is closed | `refreshMarketCache` every 10 minutes ([`muse/space.json`](../muse/space.json)) |
 
-The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on.
+The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on. `npm test` also covers the bridge's retried load and checks that `app/portfolio-tracker.js` builds no code from strings, which Muse's publishing check refuses.
 
 These were tested end to end at phone and laptop widths, with the one file loaded from a `blob:` URL on a page that had no `#app` element and no viewport tag. Every server-action call took 250 ms:
 - **Opening:** a new device opened on the host's market snapshot in about 0.5 s, with no live request before the first paint. A device with its own cache opened in about 0.3 s. With no snapshot and no cache, the first open took about 2 s, with a count.
@@ -125,6 +127,8 @@ These were tested end to end at phone and laptop widths, with the one file loade
 The UI already fits Muse's phone view:
 
 - There is no top bar on phones. The bottom navigation, **+** and refresh float above the content and slide away while you scroll down.
+- The bottom navigation and full-screen dialogs keep clear of the phone's home bar and notch (the safe areas). This needs `viewport-fit=cover` in the page's viewport tag: the space's page has it, and the one-file build adds a tag with it when a page has none. At least 8px is kept at the bottom even when the shell reports no safe area.
+- Times show in the device's own time zone, with its name (for example *Last Updated: … GMT+8*).
 - Help is under **Menu → Help & FAQ**.
 - If a space ever blocks browser storage and has no bridge, the app still runs. Settings then says plainly that changes last only until the page closes, and suggests a backup.
 
@@ -153,4 +157,4 @@ location /yahoo/q1/ { proxy_pass https://query1.finance.yahoo.com/; proxy_set_he
 location /yahoo/q2/ { proxy_pass https://query2.finance.yahoo.com/; proxy_set_header Host query2.finance.yahoo.com; proxy_set_header Cookie ""; proxy_ssl_server_name on; }
 ```
 
-Without any route the app still works with everything you enter: transactions, custom assets with your own prices, goals and backups. Listed prices then stay empty until a route is available.
+Without any route the app still works with everything you enter: transactions, custom assets with your own prices, goals and backups. Prices of listed stocks, funds and coins then stay empty until a route is available.

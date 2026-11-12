@@ -286,6 +286,10 @@ Prices update every minute while the app is open, and your space refreshes them 
 
 A brand-new space has no prices saved yet, so the first open downloads them and shows a count. After that it opens straight away.
 
+### It says "Your portfolio couldn't be loaded".
+
+Tap **Try again**. Your portfolio is safe: the app never saves over it when it can't read it. On a phone, Muse sometimes needs a few seconds to connect when you first open the space. The tracker already tries again several times on its own, so this screen is rare.
+
 ### A ticker can't be found.
 
 Search uses Yahoo Finance's ticker symbols, which add a suffix for many exchanges (`.SI` for Singapore, `.HK` for Hong Kong, `.L` for London). If Yahoo doesn't list it, add it as a **Custom Asset**.
