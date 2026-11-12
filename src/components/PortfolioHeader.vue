@@ -14,7 +14,13 @@ const infoOpen = ref(false);
 
 const h = computed(() => headline.value);
 const sym = computed(() => ccySymbol(store.base));
-const big = computed(() => (store.state?.preferences.hideValues ? '••••••' : num(h.value?.value ?? 0, 0)));
+// small amounts keep their cents (an empty portfolio reads 0.00), larger ones are rounded
+const wholeAbove1k = (v: number) => (Math.abs(v) < 1000 ? 2 : 0);
+const big = computed(() => {
+  if (store.state?.preferences.hideValues) return '••••••';
+  const v = h.value?.value ?? 0;
+  return num(v, wholeAbove1k(v));
+});
 const lastUpdated = computed(() => {
   if (!store.lastUpdated) return '';
   return new Date(store.lastUpdated).toISOString().replace('T', ' ').replace('Z', '') + ' GMT';
@@ -80,8 +86,8 @@ function togglePrivacy() {
           </template>
           <template v-else-if="tab === 'Key Stats' && keyStats">
             <div class="ks-grid">
-              <div><div class="ks-l">All-time high</div><div class="ks-v">{{ money(keyStats.ath, { decimals: 0 }).replace(sym, sym + ' ') }}</div></div>
-              <div><div class="ks-l">52-wk high</div><div class="ks-v">{{ money(keyStats.high52, { decimals: 0 }).replace(sym, sym + ' ') }}</div></div>
+              <div><div class="ks-l">All-time high</div><div class="ks-v">{{ money(keyStats.ath, { decimals: wholeAbove1k(keyStats.ath) }).replace(sym, sym + ' ') }}</div></div>
+              <div><div class="ks-l">52-wk high</div><div class="ks-v">{{ money(keyStats.high52, { decimals: wholeAbove1k(keyStats.high52) }).replace(sym, sym + ' ') }}</div></div>
               <div><div class="ks-l">Dividend Yield</div><div class="ks-v">{{ pct(keyStats.dividendYield, { sign: false }) }}</div></div>
               <div><div class="ks-l">Max Drawdown</div><div class="ks-v">{{ pct(keyStats.maxDD, { sign: false }) }}</div></div>
               <div><div class="ks-l">Max Drawdown Duration</div><div class="ks-v">{{ num(keyStats.maxDDDuration, 2) }} days</div></div>
@@ -122,8 +128,8 @@ function togglePrivacy() {
           </template>
           <template v-else-if="tab === 'Key Stats' && keyStats">
             <div class="rows">
-              <div class="row"><span>All-time high</span><span>{{ money(keyStats.ath, { decimals: 0 }) }}</span></div>
-              <div class="row"><span>52-wk high</span><span>{{ money(keyStats.high52, { decimals: 0 }) }}</span></div>
+              <div class="row"><span>All-time high</span><span>{{ money(keyStats.ath, { decimals: wholeAbove1k(keyStats.ath) }) }}</span></div>
+              <div class="row"><span>52-wk high</span><span>{{ money(keyStats.high52, { decimals: wholeAbove1k(keyStats.high52) }) }}</span></div>
               <div class="row"><span>Dividend Yield</span><span>{{ pct(keyStats.dividendYield, { sign: false }) }}</span></div>
               <div class="row"><span>Max Drawdown</span><span>{{ pct(keyStats.maxDD, { sign: false }) }}</span></div>
               <div class="row"><span>Max Drawdown Duration</span><span>{{ num(keyStats.maxDDDuration, 2) }} days</span></div>
@@ -159,7 +165,8 @@ function togglePrivacy() {
 .offline { color: var(--warn); }
 .right { flex: 0 0 auto; width: 470px; max-width: 50%; }
 .tabs { display: flex; justify-content: flex-end; gap: 40px; margin-bottom: 22px; flex-wrap: wrap; }
-.tabs.m { justify-content: flex-start; gap: 20px; padding: 14px 16px 0; overflow-x: auto; flex-wrap: nowrap; }
+// phone sheet: four equal tabs that always fit; long names wrap onto two lines
+.tabs.m { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 14px 12px 0; .tab { white-space: normal; text-align: center; line-height: 17px; font-size: 13.5px; } }
 .tab { background: none; border: 0; color: var(--muted); font: 500 14px/20px var(--font); padding: 4px 0; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
 .tab:hover { color: var(--text-2); }
 .tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); }

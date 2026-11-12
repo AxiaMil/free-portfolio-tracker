@@ -1,0 +1,2 @@
+# prebuilt drop-in copy of the app (npm run build:app); collapsed in diffs and left out of language stats
+app/** linguist-generated=true

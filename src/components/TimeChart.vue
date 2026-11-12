@@ -38,6 +38,8 @@ const props = withDefaults(defineProps<{
   yMax?: number;
   hideZoom?: boolean;
   legendBelow?: boolean;
+  /** date range to show while the series has no data yet (e.g. yesterday → today) */
+  emptyRange?: [string, string];
 }>(), { zooms: () => ['1m', '3m', '6m', 'Ytd', '1y', '3y', '5y', 'All'], zoomLabel: 'Zoom', height: 430, showYAxis: false, showRange: true, navigator: true, hideZoom: false });
 
 const emit = defineEmits<{ (e: 'range', v: [string, string]): void }>();
@@ -59,6 +61,7 @@ const allDates = computed(() => {
 
 const zoom = ref(props.initialZoom ?? props.zooms[props.zooms.length - 1]);
 const range = ref<[string, string]>(['', '']);
+const shownRange = computed(() => (range.value[0] ? range.value : props.emptyRange ?? null));
 
 function zoomStart(z: string, end: string): string {
   const k = z.toLowerCase();
@@ -211,7 +214,7 @@ const option = computed(() => {
         <span class="mr-2">{{ zoomLabel }}</span>
         <button v-for="z in zooms" :key="z" class="z" :class="{ active: zoom === z }" :disabled="zoomDisabled(z)" @click="applyZoom(z)">{{ z }}</button>
       </div>
-      <div v-if="showRange && mdAndUp && range[0]" class="range">{{ range[0] }} <span class="mx-3">→</span> {{ range[1] }}</div>
+      <div v-if="showRange && mdAndUp && shownRange" class="range">{{ shownRange[0] }} <span class="mx-3">→</span> {{ shownRange[1] }}</div>
     </div>
     <slot v-if="!legendBelow" name="legend" />
     <div class="tc-chart" :style="{ height: height + 'px' }">

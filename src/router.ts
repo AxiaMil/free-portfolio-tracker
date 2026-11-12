@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 
 export const NAV = [
   { title: 'Home', icon: 'mdi-home', to: '/portfolio' },
@@ -19,7 +19,8 @@ export const MANAGE = [
 ];
 
 export const router = createRouter({
-  history: createWebHistory(),
+  // #/ routes: works from any static host or sub-folder without server rewrite rules
+  history: createWebHashHistory(),
   routes: [
     { path: '/', redirect: '/portfolio' },
     { path: '/portfolio', component: () => import('./pages/HomePage.vue') },
@@ -33,6 +34,7 @@ export const router = createRouter({
     { path: '/transactions', component: () => import('./pages/TransactionsPage.vue') },
     { path: '/custom-assets', component: () => import('./pages/CustomAssetsPage.vue') },
     { path: '/menu', component: () => import('./pages/MenuPage.vue') },
+    { path: '/settings', redirect: '/menu' },
     { path: '/menu/:section', component: () => import('./pages/MenuPage.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/portfolio' },
   ],

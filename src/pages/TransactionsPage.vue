@@ -174,8 +174,8 @@ function describe(id: string): string {
 function askDelete(ids: string[]) {
   if (!ids.length) return;
   confirm.value = ids.length === 1
-    ? { ids, title: 'Delete transaction?', text: `${describe(ids[0])} will be removed from ${activePortfolio.value?.name}. A copy of your previous data is kept in data/backups.` }
-    : { ids, title: `Delete ${ids.length} transactions?`, text: `The ${ids.length} selected transactions will be removed from ${activePortfolio.value?.name}. A copy of your previous data is kept in data/backups.` };
+    ? { ids, title: 'Delete transaction?', text: `${describe(ids[0])} will be removed from ${activePortfolio.value?.name}. Earlier versions stay in Settings → Data & Backup → Automatic snapshots.` }
+    : { ids, title: `Delete ${ids.length} transactions?`, text: `The ${ids.length} selected transactions will be removed from ${activePortfolio.value?.name}. Earlier versions stay in Settings → Data & Backup → Automatic snapshots.` };
 }
 function doDelete() {
   const ids = confirm.value?.ids ?? [];
@@ -239,7 +239,7 @@ const autoLabel = (a: Row['auto']) => (a === 'deposit' ? 'Auto deposit: covers t
     <!-- heading -->
     <div class="head1">
       <h1 class="tx-title">Transactions</h1>
-      <v-tooltip text="Transactions you enter or import in this app. They are saved in data/portfolio.json.">
+      <v-tooltip text="Transactions you enter or import in this app. They are saved automatically.">
         <template #activator="{ props }">
           <fieldset v-bind="props" class="src"><legend>Source</legend><v-icon size="22">mdi-database</v-icon><span>This app</span></fieldset>
         </template>
@@ -433,7 +433,7 @@ const autoLabel = (a: Row['auto']) => (a === 'deposit' ? 'Auto deposit: covers t
         </div>
         <div v-if="!paged.length" class="empty">
           <template v-if="itemCount">No transactions match. <button class="lnk" @click="search = ''; clearFilters()">Clear</button></template>
-          <template v-else>No transactions yet.</template>
+          <template v-else>No transactions yet. <button class="lnk" @click="addTxn">Add your first transaction</button> or upload a CSV file.</template>
         </div>
       </template>
 
@@ -515,11 +515,13 @@ const autoLabel = (a: Row['auto']) => (a === 'deposit' ? 'Auto deposit: covers t
 .lnk { background: none; border: 0; padding: 0; color: var(--primary-text); font: 600 13px/1.4 var(--font); cursor: pointer; &:disabled { opacity: 0.4; cursor: default; } }
 .muted-l { color: var(--text-2); }
 
-.fmenu { width: 384px; padding: 6px 16px 10px; background: var(--surface-2) !important; }
+.fmenu { width: 384px; max-width: calc(100vw - 24px); padding: 6px 16px 10px; background: var(--surface-2) !important; }
 .fm-lbl { font-size: 11.5px; font-weight: 600; letter-spacing: 0.6px; color: var(--muted); text-transform: uppercase; margin: 12px 0 8px; }
 .fchips { display: flex; flex-wrap: wrap; gap: 6px; }
 .fchip { border: 1px solid var(--border-strong); background: transparent; color: var(--text-2); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; &.on { background: var(--nav-active-bg); border-color: var(--primary); color: var(--primary-fg); } }
-.fm-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fm-dates { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; :deep(input) { min-width: 0; } }
+// narrow phones: the two date fields go one above the other
+@media (max-width: 419px) { .fm-dates { grid-template-columns: 1fr; } }
 .fm-foot { display: flex; align-items: center; margin-top: 14px; }
 
 .table-wrap { overflow-x: auto; }
@@ -558,7 +560,10 @@ const autoLabel = (a: Row['auto']) => (a === 'deposit' ? 'Auto deposit: covers t
   .src { min-width: 157px; }
   .head2 { margin-top: 17px; }
   .btn-primary { height: 28px; padding: 0 12px; font-size: 12.5px; letter-spacing: 1.1px; }
-  .tcard { border-radius: 12px 12px 0 0; border-bottom: 0; overflow: visible; }
+  // a closed card on phone too, so an empty or short list doesn't look cut off; the pager sits inside it
+  // (rows always end with the pager, and each row's bottom line separates the last one from it)
+  .tcard { overflow: visible; }
+  .m-pager { padding: 14px 12px 12px; }
   .tbar { padding: 12px 12px 0 12px; border-bottom: 0; min-height: 0; gap: 10px; }
   .search { flex: 1 1 auto; }
 }

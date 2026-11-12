@@ -1,10 +1,14 @@
-// Global app store: persisted state (via the local server), market data, and the computed portfolio.
+// Global app store: persisted state (see platform/storage.ts), market data (market/client.ts), and the computed portfolio.
 import { computed, reactive, shallowRef, watch } from 'vue';
 import type { AppState, MarketBundle, Method, Portfolio, Txn } from './engine/types.ts';
 import { MarketView, fxSymbol } from './engine/market.ts';
 import { computePortfolio, type EngineResult } from './engine/portfolio.ts';
 import type { PeriodKey } from './engine/periods.ts';
 import { todayLocal, uid } from './engine/util.ts';
+import { freshState, loadState, newPortfolio, requestPersistence, saveState } from './platform/storage.ts';
+import { getCharts, getProfiles, getQuotes, search } from './market/client.ts';
+
+export { newPortfolio };
 
 export const BENCH_NAMES: Record<string, string> = {
   '^GSPC': 'S&P500', '^IXIC': 'NASDAQ', '^NYA': 'NYSE', SPY: 'SPY', '^DJI': 'Dow Jones', '^STI': 'STI', '^HSI': 'Hang Seng',
@@ -27,6 +31,7 @@ export const store = reactive({
     return activePortfolio.value?.currency ?? 'USD';
   },
   snackbar: { show: false, text: '', color: '' },
+  helpOpen: false,
   addDialog: { open: false, prefill: null as Partial<Txn> | null },
 });
 
@@ -64,12 +69,6 @@ export function toast(text: string, color = '') {
 }
 
 // ---------------- persistence ----------------
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, init);
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json();
-}
-
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let loaded = false;
 function scheduleSave() {
@@ -77,18 +76,16 @@ function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
-      await api('/api/state', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(store.state) });
+      if (store.state) await saveState(store.state);
       store.saveError = '';
     } catch (e) {
-      store.saveError = String(e);
-      toast('Could not save changes to disk', 'error');
+      store.saveError = String(e instanceof Error ? e.message : e);
+      toast('Could not save your changes', 'error');
     }
   }, 350);
 }
 
 // ---------------- market data ----------------
-const enc = (xs: string[]) => xs.map(encodeURIComponent).join(',');
-
 function neededSymbols(): { assets: string[]; benches: string[] } {
   const p = activePortfolio.value;
   if (!p) return { assets: [], benches: [] };
@@ -112,14 +109,14 @@ function fxPairs(symbols: string[]): string[] {
 
 async function loadCharts(symbols: string[], force = false) {
   if (!symbols.length) return;
-  const charts = await api<MarketBundle['charts']>(`/api/charts?symbols=${enc(symbols)}${force ? '&force=1' : ''}`);
+  const charts = await getCharts(symbols, { force });
   market.value = { ...market.value, charts: { ...market.value.charts, ...charts } };
   if (Object.values(charts).some((c) => c.stale)) store.offline = true;
 }
 
 async function loadQuotes(symbols: string[], force = false) {
   if (!symbols.length) return;
-  const r = await api<{ quotes: MarketBundle['quotes']; offline: boolean }>(`/api/quotes?symbols=${enc(symbols)}${force ? '&force=1' : ''}`);
+  const r = await getQuotes(symbols, { force });
   market.value = { ...market.value, quotes: { ...market.value.quotes, ...r.quotes } };
   store.offline = r.offline;
   const times = Object.values(r.quotes).map((q) => q.fetchedAt).filter(Boolean);
@@ -128,7 +125,7 @@ async function loadQuotes(symbols: string[], force = false) {
 
 async function loadProfiles(symbols: string[], force = false) {
   if (!symbols.length) return;
-  const profiles = await api<MarketBundle['profiles']>(`/api/profiles?symbols=${enc(symbols)}${force ? '&force=1' : ''}`);
+  const profiles = await getProfiles(symbols, { force });
   market.value = { ...market.value, profiles: { ...market.value.profiles, ...profiles } };
 }
 
@@ -170,8 +167,9 @@ function startTimers() {
 
 export async function init() {
   try {
-    store.state = await api<AppState>('/api/state');
-    if (!store.state.portfolios.length) store.state.portfolios.push(newPortfolio('My Portfolio'));
+    // first run starts empty: one portfolio, no transactions
+    store.state = (await loadState()) ?? freshState();
+    requestPersistence();
     loaded = true;
     watch(() => store.state, scheduleSave, { deep: true });
     // new symbols (e.g. after adding a transaction) trigger a fetch
@@ -186,13 +184,6 @@ export async function init() {
 }
 
 // ---------------- mutations ----------------
-export function newPortfolio(name: string, currency = 'USD'): Portfolio {
-  return {
-    id: uid('p'), name, currency, benchmark: '^GSPC', benchmarks: ['^GSPC', '^IXIC', '^NYA', 'SPY'], dividendTaxRate: 0, autoDividend: true, margin: false,
-    transactions: [], customAssets: [], goal: null, rebalance: { mode: 'pct', targets: {}, extraAssets: [] },
-  };
-}
-
 export function addTransactions(txns: Omit<Txn, 'id'>[]) {
   const p = activePortfolio.value;
   if (!p) return;
@@ -224,5 +215,5 @@ export function openAddTransaction(prefill: Partial<Txn> | null = null) {
 }
 
 export function fetchSearch(q: string) {
-  return api<Array<{ symbol: string; name: string; exchange: string; type: string }>>(`/api/search?q=${encodeURIComponent(q)}`);
+  return search(q);
 }

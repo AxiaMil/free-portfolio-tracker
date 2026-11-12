@@ -67,7 +67,7 @@ function onEnter() {
 
 <template>
   <v-dialog v-model="open" :max-width="mdAndUp ? 520 : undefined" :fullscreen="!mdAndUp" scrollable>
-    <v-card class="add-card">
+    <v-card class="add-card" :class="{ full: !mdAndUp }">
       <div class="hd">
         <span class="t">Add Asset</span>
         <v-spacer />
@@ -103,6 +103,9 @@ function onEnter() {
 
 <style scoped lang="scss">
 .add-card { padding: 18px 20px 14px; border-radius: 16px !important; }
+// full screen on phones: square corners, the field keeps its height and the results take the rest
+.add-card.full { border-radius: 0 !important; .results { flex: 1 1 auto; max-height: none; } }
+.q { flex: 0 0 auto; }
 .hd { display: flex; align-items: center; }
 .t { font-size: 18px; font-weight: 700; }
 .x { background: none; border: 0; color: var(--text-2); cursor: pointer; display: inline-flex; }

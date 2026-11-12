@@ -23,10 +23,15 @@ export const primaryBench = computed(() => activePortfolio.value?.benchmark ?? '
 
 export const headline = computed(() => {
   const r = result.value;
-  if (!r || !r.series.length) return null;
+  if (!r) return null;
   const s = r.series;
   const method: Method = store.method;
   const b = primaryBench.value;
+  if (!s.length) {
+    // no transactions yet: the same headline, all zeros
+    const zero = { gain: 0, pct: 0 };
+    return { value: 0, today: zero, yesterday: zero, period: null, all: null, bench: { symbol: b, value: 0, today: zero, yesterday: zero, all: null }, noInvest: { value: 0 } };
+  }
   const benchVal = (p: DayPoint) => p.bench[b] ?? 0;
   const period = periodReturnByKey(s, store.headerPeriod, r.today, method);
   const all = periodReturnByKey(s, 'All', r.today, method);
@@ -55,6 +60,11 @@ export const gainsAndReturns = computed(() => {
   return HEADER_PERIODS.map((k) => ({ key: k, label: k === 'All' ? 'All-Time' : k, available: periodAvailable(k, r.today, r.inception), res: periodReturnByKey(r.series, k, r.today, store.method, portfolioAccessor) }));
 });
 
+/** risk needs at least two days of history; before that only YTD and All are offered */
+export const hasRiskHistory = computed(() => (result.value?.series.length ?? 0) >= 2);
+export const RISK_PERIODS: PeriodKey[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'All'];
+export const riskPeriods = computed<PeriodKey[]>(() => (hasRiskHistory.value ? RISK_PERIODS : ['YTD', 'All']));
+
 export const allRisk = computed(() => {
   const r = result.value;
   if (!r || r.series.length < 2) return null;
@@ -63,7 +73,9 @@ export const allRisk = computed(() => {
 
 export const keyStats = computed(() => {
   const r = result.value;
-  if (!r || !r.series.length) return null;
+  if (!r) return null;
+  // no transactions yet: every stat reads zero
+  if (!r.series.length) return { ath: 0, high52: 0, dividendYield: 0, maxDD: 0, maxDDDuration: 0, sharpe: 0, beta: 0 };
   const s = r.series;
   let ath = 0;
   let high52 = 0;

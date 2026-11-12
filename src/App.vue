@@ -9,13 +9,13 @@ import HelpDialog from './components/HelpDialog.vue';
 import AppLogo from './components/AppLogo.vue';
 import { applyAppearance } from './appearance.ts';
 import { DEFAULT_THEME } from './theme.ts';
+import { useHideOnScroll } from './composables/useHideOnScroll.ts';
 
 const { mdAndUp } = useDisplay();
 const route = useRoute();
 const rail = ref(false);
 const toolsOpen = ref(true);
 const manageOpen = ref(true);
-const helpOpen = ref(false);
 
 const MOBILE_TABS = [
   { icon: 'mdi-home', to: '/portfolio' },
@@ -26,13 +26,18 @@ const MOBILE_TABS = [
   { icon: 'mdi-menu', to: '/menu' },
 ];
 
+// phone: the bottom navigation, + and refresh slide away while scrolling down
+const phone = computed(() => !mdAndUp.value);
+const barsHidden = useHideOnScroll(phone, () => route.path);
+// settings pages (Menu → a section) have nothing to add or refresh, and the buttons would sit on their text
+const showFabs = computed(() => !/^\/menu\/./.test(route.path));
+
 const isActive = (to: string) => (to === '/allocation' ? route.path === '/allocation' : route.path === to || route.path.startsWith(to + '/'));
-const initial = computed(() => store.state?.preferences.userInitial || 'A');
 
 async function onRefresh() {
   await refreshMarket(true);
 }
-watch(() => route.path, () => { helpOpen.value = false; });
+watch(() => route.path, () => { store.helpOpen = false; });
 // apply the saved theme + accent on startup and whenever they change; pages remount so charts pick up new colours
 const themeName = ref<string>(DEFAULT_THEME);
 watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.theme, store.state?.preferences.accent); });
@@ -79,21 +84,24 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
       </nav>
       <template #append>
         <div class="help-row">
-          <button class="nav-item" @click="helpOpen = true"><v-icon size="20">mdi-help-circle-outline</v-icon><span v-if="!rail">Help</span></button>
+          <button class="nav-item" @click="store.helpOpen = true"><v-icon size="20">mdi-help-circle-outline</v-icon><span v-if="!rail">Help</span></button>
         </div>
       </template>
     </v-navigation-drawer>
 
-    <!-- top bar -->
-    <div class="topbar" :class="{ mobile: !mdAndUp }">
-      <button v-if="!mdAndUp" class="avatar" @click="$router.push('/menu')">{{ initial }}</button>
-      <v-spacer />
+    <!-- desktop: floating actions, top right -->
+    <div v-if="mdAndUp" class="topbar">
       <v-tooltip text="Add transaction"><template #activator="{ props }"><button v-bind="props" class="round-btn" aria-label="Add transaction" @click="openAddTransaction()"><v-icon size="20">mdi-plus</v-icon></button></template></v-tooltip>
-      <v-tooltip :text="store.offline ? 'Offline — showing cached prices. Click to retry' : 'Refresh prices'"><template #activator="{ props }">
-        <button v-bind="props" class="round-btn" :class="{ spinning: store.refreshing, offline: store.offline }" aria-label="Refresh" @click="onRefresh"><v-icon size="20">mdi-refresh</v-icon></button>
+      <v-tooltip :text="store.offline ? 'Offline: showing cached prices. Click to retry' : 'Refresh prices'"><template #activator="{ props }">
+        <button v-bind="props" class="round-btn" :class="{ spinning: store.refreshing, offline: store.offline }" aria-label="Refresh prices" @click="onRefresh"><v-icon size="20">mdi-refresh</v-icon></button>
       </template></v-tooltip>
-      <v-tooltip text="Help"><template #activator="{ props }"><button v-bind="props" class="round-btn" aria-label="Help" @click="helpOpen = true"><v-icon size="20">mdi-help</v-icon></button></template></v-tooltip>
-      <button v-if="mdAndUp" class="avatar" @click="$router.push('/menu')">{{ initial }}</button>
+      <v-tooltip text="Help"><template #activator="{ props }"><button v-bind="props" class="round-btn" aria-label="Help" @click="store.helpOpen = true"><v-icon size="20">mdi-help</v-icon></button></template></v-tooltip>
+    </div>
+
+    <!-- phone: no top bar; refresh and add float above the bottom navigation -->
+    <div v-else-if="showFabs" class="fabs" :class="{ away: barsHidden }" :inert="barsHidden || undefined">
+      <button class="fab mini" :class="{ spinning: store.refreshing, offline: store.offline }" :aria-label="store.offline ? 'Offline: showing cached prices. Tap to retry' : 'Refresh prices'" data-test="fab-refresh" @click="onRefresh"><v-icon size="20">mdi-refresh</v-icon></button>
+      <button class="fab main" aria-label="Add transaction" data-test="fab-add" @click="openAddTransaction()"><v-icon size="26">mdi-plus</v-icon></button>
     </div>
 
     <v-main :class="{ 'with-sidebar': mdAndUp }">
@@ -102,7 +110,7 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
         <div class="muted mt-4">Your performance is being updated</div>
       </div>
       <div v-else-if="store.error" class="loading">
-        <div class="neg">Could not reach the local server: {{ store.error }}</div>
+        <div class="neg">Could not load your saved data: {{ store.error }}</div>
       </div>
       <router-view v-else v-slot="{ Component }">
         <component :is="Component" :key="route.path.startsWith('/menu') ? 'menu' : themeName" />
@@ -110,15 +118,15 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
     </v-main>
 
     <!-- mobile bottom navigation -->
-    <nav v-if="!mdAndUp" class="bottom-nav">
+    <nav v-if="!mdAndUp" class="bottom-nav" :class="{ away: barsHidden }" :inert="barsHidden || undefined">
       <router-link v-for="t in MOBILE_TABS" :key="t.to" :to="t.to" class="bn-item" :class="{ active: isActive(t.to) }">
         <v-icon size="22">{{ t.icon }}</v-icon>
       </router-link>
     </nav>
 
     <AddTransactionDialog />
-    <HelpDialog v-model="helpOpen" />
-    <v-snackbar v-model="store.snackbar.show" :color="store.snackbar.color || undefined" timeout="2600" location="bottom">{{ store.snackbar.text }}</v-snackbar>
+    <HelpDialog v-model="store.helpOpen" />
+    <v-snackbar v-model="store.snackbar.show" :class="{ 'snack-up': !mdAndUp && !barsHidden }" :color="store.snackbar.color || undefined" timeout="2600" location="bottom">{{ store.snackbar.text }}</v-snackbar>
   </v-app>
 </template>
 
@@ -212,33 +220,49 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 8px 0 0;
+  padding: 12px 20px 0 0;
   pointer-events: none;
   > * { pointer-events: auto; }
-  &.mobile {
-    left: 0;
-    gap: 12px;
-    padding: calc(12px + env(safe-area-inset-top)) 12px 10px 13px;
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--line-soft);
-  }
 }
-.round-btn.spinning .v-icon { animation: spin 0.9s linear infinite; }
-.round-btn.offline { border-color: var(--warn); color: var(--warn); }
+.round-btn.spinning .v-icon, .fab.spinning .v-icon { animation: spin 0.9s linear infinite; }
+.round-btn.offline, .fab.offline { border-color: var(--warn); color: var(--warn); }
 @keyframes spin { to { transform: rotate(360deg); } }
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--nav-active-bg);
-  color: var(--text);
-  border: 0;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
+// phone chrome hides while scrolling down: an iOS-drawer curve, transform only, under 300ms
+$ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+.bottom-nav, .fabs { transition: transform 240ms $ease-drawer, opacity 240ms $ease-drawer; }
+.bottom-nav.away { transform: translateY(100%); }
+// the buttons sit 72px above the screen edge (nav + gap), so move them their own height plus that
+.fabs.away { transform: translateY(calc(100% + 72px + env(safe-area-inset-bottom))); }
+@media (prefers-reduced-motion: reduce) {
+  // no sliding: they simply fade out and back in
+  .bottom-nav, .fabs { transition: opacity 150ms ease; }
+  .bottom-nav.away, .fabs.away { transform: none; opacity: 0; pointer-events: none; }
 }
+// phone: refresh (small) stacked over add (large), right side, just above the bottom navigation
+.fabs {
+  position: fixed;
+  right: 16px;
+  bottom: calc(56px + 16px + env(safe-area-inset-bottom));
+  z-index: 1006;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, filter 0.15s ease;
+  &:active { transform: scale(0.94); }
+  .v-icon { color: inherit; }
+  &.main { width: 56px; height: 56px; border: 0; background: var(--primary); color: var(--primary-fg); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35), 0 4px 14px var(--primary-soft); }
+  &.mini { width: 44px; height: 44px; border: 1px solid var(--border-strong); background: color-mix(in srgb, var(--surface-2) 92%, transparent); color: var(--text-2); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+}
+.snack-up :deep(.v-snackbar__wrapper) { margin-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .loading { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .bottom-nav {
   position: fixed;
@@ -266,5 +290,5 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
   }
 }
 :deep(.v-main) { padding-top: 0; }
-.v-main:not(.with-sidebar) { padding-top: calc(64px + env(safe-area-inset-top)) !important; }
+.v-main:not(.with-sidebar) { padding-top: env(safe-area-inset-top) !important; }
 </style>

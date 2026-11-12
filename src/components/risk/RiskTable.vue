@@ -2,19 +2,19 @@
 // Metric x period table (time-weighted, vs the main benchmark). Annualized ratios are withheld below ~6 months.
 import { computed } from 'vue';
 import { result } from '../../store.ts';
-import { primaryBench } from '../../composables/stats.ts';
+import { hasRiskHistory, primaryBench, riskPeriods } from '../../composables/stats.ts';
 import { riskMetrics, type RiskMetrics } from '../../engine/risk.ts';
-import { periodBaseDate, type PeriodKey } from '../../engine/periods.ts';
+import { periodBaseDate } from '../../engine/periods.ts';
 import { num, pct, signClass } from '../../format.ts';
 import ShareButton from '../ShareButton.vue';
 
-const PERIODS: PeriodKey[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'All'];
 const DASH = '–';
+const PERIODS = riskPeriods;
 
 const cols = computed(() => {
   const r = result.value;
-  if (!r || r.series.length < 2) return PERIODS.map(() => null);
-  return PERIODS.map((k) => riskMetrics(r.series, k === 'All' ? null : periodBaseDate(k, r.today), r.today, primaryBench.value));
+  if (!r || !hasRiskHistory.value) return PERIODS.value.map(() => null);
+  return PERIODS.value.map((k) => riskMetrics(r.series, k === 'All' ? null : periodBaseDate(k, r.today), r.today, primaryBench.value));
 });
 
 type Cell = { text: string; cls: string };
@@ -37,11 +37,13 @@ const ROWS: Array<{ label: string; get: (m: RiskMetrics) => Cell }> = [
   { label: 'Calmar', get: (m) => cell(m.calmar, 'ratio') },
 ];
 
-const table = computed(() => ROWS.map((row) => ({ label: row.label, cells: cols.value.map((m) => (m ? row.get(m) : { text: DASH, cls: 'na' })) })));
-const anyWithheld = computed(() => cols.value.some((m) => m && !m.enough));
+// no history yet: return reads 0.00%, every other measure is withheld
+const emptyCell = (label: string): Cell => (label === 'Return' ? { text: pct(0, { sign: false }), cls: '' } : { text: DASH, cls: 'na' });
+const table = computed(() => ROWS.map((row) => ({ label: row.label, cells: cols.value.map((m) => (m ? row.get(m) : emptyCell(row.label))) })));
+const anyWithheld = computed(() => !hasRiskHistory.value || cols.value.some((m) => m && !m.enough));
 
 function csv() {
-  return [['Metric', ...PERIODS], ...table.value.map((r) => [r.label, ...r.cells.map((c) => (c.text === DASH ? '' : c.text))])];
+  return [['Metric', ...PERIODS.value], ...table.value.map((r) => [r.label, ...r.cells.map((c) => (c.text === DASH ? '' : c.text))])];
 }
 </script>
 

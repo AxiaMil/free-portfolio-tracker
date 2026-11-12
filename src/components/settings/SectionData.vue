@@ -1,18 +1,18 @@
 <script setup lang="ts">
-// Data & Backup: download / restore the whole state as JSON, export every transaction as CSV, show where data lives.
+// Data & Backup: download / restore the whole state as JSON, export every transaction as CSV,
+// show where data is saved, and restore one of the automatic snapshots.
 import { computed, onMounted, ref } from 'vue';
-import { store, newPortfolio, refreshMarket, toast } from '../../store.ts';
-import type { AppState, Portfolio, Preferences } from '../../engine/types.ts';
+import { store, refreshMarket, toast } from '../../store.ts';
+import type { AppState } from '../../engine/types.ts';
+import { listSnapshots, normalizeState, readSnapshot, storageInfo, type Snapshot } from '../../platform/storage.ts';
 import { csvLine, downloadText } from '../txn/fmt.ts';
 import ConfirmDialog from '../txn/ConfirmDialog.vue';
 
-const dataDir = ref('');
-onMounted(async () => {
-  try {
-    const r = await fetch('/api/status').then((x) => x.json());
-    dataDir.value = r.dataDir ?? '';
-  } catch { /* offline server: keep the relative paths */ }
-});
+const where = storageInfo();
+const snapshots = ref<Snapshot[]>([]);
+const showAllSnaps = ref(false);
+onMounted(async () => { snapshots.value = await listSnapshots(); });
+const snapTime = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 const stats = computed(() => {
   const ps = store.state?.portfolios ?? [];
@@ -41,30 +41,13 @@ const pending = ref<AppState | null>(null);
 const pendingName = ref('');
 const confirmOpen = computed({ get: () => !!pending.value, set: (v: boolean) => { if (!v) pending.value = null; } });
 
-function normalize(raw: unknown): AppState {
-  const d = raw as Partial<AppState>;
-  if (!d || typeof d !== 'object' || !Array.isArray(d.portfolios) || !d.portfolios.length) throw new Error('This file has no portfolios');
-  const portfolios: Portfolio[] = d.portfolios.map((p, i) => {
-    if (!p || typeof p !== 'object' || !Array.isArray(p.transactions)) throw new Error(`Portfolio ${i + 1} has no transactions list`);
-    const blank = newPortfolio(String(p.name || `Portfolio ${i + 1}`), String(p.currency || 'USD'));
-    return { ...blank, ...p, id: String(p.id || blank.id), customAssets: Array.isArray(p.customAssets) ? p.customAssets : [], benchmarks: Array.isArray(p.benchmarks) && p.benchmarks.length ? p.benchmarks : blank.benchmarks };
-  });
-  const cur = store.state?.preferences;
-  const preferences: Preferences = {
-    hideValues: false, decimalSeparator: '.', thousandSeparator: ',', costMethod: 'FIFO', accent: '', theme: '', userInitial: 'A',
-    ...(cur ?? {}), ...((d.preferences ?? {}) as Partial<Preferences>),
-  };
-  const active = portfolios.some((p) => p.id === d.activePortfolioId) ? String(d.activePortfolioId) : portfolios[0].id;
-  return { version: Number(d.version) || 1, activePortfolioId: active, preferences, portfolios };
-}
-
 async function onFile(ev: Event) {
   const input = ev.target as HTMLInputElement;
   const f = input.files?.[0];
   input.value = '';
   if (!f) return;
   try {
-    pending.value = normalize(JSON.parse(await f.text()));
+    pending.value = normalizeState(JSON.parse(await f.text()), store.state?.preferences);
     pendingName.value = f.name;
   } catch (e) {
     toast(`Could not read ${f.name}: ${e instanceof Error ? e.message : e}`, 'error');
@@ -90,7 +73,14 @@ function restore() {
   pending.value = null;
 }
 
-const path = (rel: string) => (dataDir.value ? `${dataDir.value.replace(/\/$/, '')}/${rel}` : `data/${rel}`);
+async function restoreSnapshot(snap: Snapshot) {
+  try {
+    pending.value = await readSnapshot(snap.key);
+    pendingName.value = `the snapshot from ${snapTime(snap.at)}`;
+  } catch (e) {
+    toast(`Could not read that snapshot: ${e instanceof Error ? e.message : e}`, 'error');
+  }
+}
 </script>
 
 <template>
@@ -102,9 +92,9 @@ const path = (rel: string) => (dataDir.value ? `${dataDir.value.replace(/\/$/, '
       <div><b>{{ stats.txns }}</b><span>transactions</span></div>
       <div><b>{{ stats.custom }}</b><span>custom assets</span></div>
     </div>
-    <div class="saved" :class="{ bad: store.saveError }">
-      <v-icon size="16">{{ store.saveError ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon>
-      {{ store.saveError ? 'Last save failed: ' + store.saveError : 'Every change is saved to disk automatically.' }}
+    <div class="saved" :class="{ bad: store.saveError || where.kind === 'memory' }">
+      <v-icon size="16">{{ store.saveError || where.kind === 'memory' ? 'mdi-alert-circle' : 'mdi-check-circle' }}</v-icon>
+      {{ store.saveError ? 'Last save failed: ' + store.saveError : where.kind === 'memory' ? 'Changes are kept only until this page closes.' : 'Every change is saved automatically.' }}
     </div>
 
     <div class="sec-h mt">Backup &amp; restore</div>
@@ -113,28 +103,49 @@ const path = (rel: string) => (dataDir.value ? `${dataDir.value.replace(/\/$/, '
       <button class="btn-outline" data-test="restore" @click="fileInput?.click()"><v-icon size="18">mdi-backup-restore</v-icon>Restore from file</button>
       <button class="btn-outline" data-test="export-all" @click="exportAll"><v-icon size="18">mdi-file-delimited-outline</v-icon>Export all transactions (CSV)</button>
     </div>
-    <div class="r-d mt-2">Restoring replaces all portfolios and settings with the file's contents. The current version is kept in the backups folder first.</div>
+    <div class="r-d mt-2">Restoring replaces all portfolios and settings with the file's contents. The version you have now stays in the snapshots below.</div>
 
-    <div class="sec-h mt">Where it is stored</div>
+    <div class="sec-h mt">Where it is saved</div>
     <div class="files">
-      <div class="f"><v-icon size="18">mdi-file-document-outline</v-icon><div><code>{{ path('portfolio.json') }}</code><span>Portfolios, transactions, custom assets and settings</span></div></div>
-      <div class="f"><v-icon size="18">mdi-folder-clock-outline</v-icon><div><code>{{ path('backups/') }}</code><span>The previous 30 versions, written automatically on every save</span></div></div>
-      <div class="f"><v-icon size="18">mdi-folder-outline</v-icon><div><code>{{ path('cache/') }}</code><span>Cached market prices so the app keeps working offline</span></div></div>
+      <div class="f">
+        <v-icon size="18" :class="{ 'warn-t': where.kind === 'memory' }">{{ where.kind === 'host' ? 'mdi-database-outline' : where.kind === 'memory' ? 'mdi-alert-outline' : 'mdi-file-document-outline' }}</v-icon>
+        <div>
+          <b>{{ where.label }}</b>
+          <span v-if="where.kind === 'browser'">Portfolios, transactions, custom assets and settings are kept in this browser's storage for this site. Nothing is uploaded. Download a backup to move them to another browser or device.</span>
+          <span v-else-if="where.kind === 'memory'" class="warn-t">The page this tracker runs in blocks browser storage, so your changes are lost when it closes. Download a backup before you leave, and restore it next time.</span>
+          <span v-else>Portfolios, transactions, custom assets and settings are saved by the app this tracker runs in.</span>
+        </div>
+      </div>
+      <div class="f"><v-icon size="18">mdi-folder-outline</v-icon><div><b>Market data cache</b><span>Prices, dividends and FX rates are cached in this browser so the app keeps working offline.</span></div></div>
     </div>
-    <div class="r-d mt-2">Copy the data folder to move everything to another computer.</div>
+
+    <div class="sec-h mt">Automatic snapshots</div>
+    <div v-if="!snapshots.length" class="r-d">A snapshot of your data is kept in this browser at most every 5 minutes while you make changes (the last 30). None yet.</div>
+    <div v-else class="snaps">
+      <div v-for="snap in (showAllSnaps ? snapshots : snapshots.slice(0, 5))" :key="snap.key" class="snap">
+        <v-icon size="18">mdi-folder-clock-outline</v-icon>
+        <div><b>{{ snapTime(snap.at) }}</b><span>{{ snap.portfolios }} portfolio{{ snap.portfolios === 1 ? '' : 's' }}, {{ snap.transactions }} transactions</span></div>
+        <button class="btn-outline sm" @click="restoreSnapshot(snap)">Restore</button>
+      </div>
+      <button v-if="snapshots.length > 5" class="more" @click="showAllSnaps = !showAllSnaps">{{ showAllSnaps ? 'Show fewer' : `Show all ${snapshots.length}` }}</button>
+    </div>
 
     <ConfirmDialog v-model="confirmOpen" title="Restore this backup?" confirm-text="Restore" @confirm="restore">
       <p class="mt-0">{{ pendingName }} contains {{ pendingSummary }}.</p>
-      <p class="mb-0">Everything currently in the app will be replaced. The current version is kept in data/backups.</p>
+      <p class="mb-0">Everything currently in the app will be replaced. The current version is kept as a snapshot.</p>
     </ConfirmDialog>
   </div>
 </template>
 
 <style scoped lang="scss">
 @use './section.scss';
+.warn-t { color: var(--warn) !important; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; div { display: flex; flex-direction: column; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; } b { font-size: 20px; font-weight: 600; line-height: 26px; } span { font-size: 12px; color: var(--text-2); } }
 .saved { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--text-2); .v-icon { color: var(--pos); } &.bad { color: var(--neg); .v-icon { color: var(--neg); } } }
 .acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .files { display: flex; flex-direction: column; gap: 8px; }
-.f { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; .v-icon { color: var(--primary-text); margin-top: 1px; } div { display: flex; flex-direction: column; min-width: 0; } code { font-family: var(--mono); font-size: 12.5px; color: var(--text); word-break: break-all; } span { font-size: 12.5px; color: var(--text-2); } }
+.f, .snap { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; > .v-icon { color: var(--primary-text); margin-top: 1px; } > div { display: flex; flex-direction: column; min-width: 0; flex: 1; } b { font-size: 13.5px; font-weight: 600; color: var(--text); } span { font-size: 12.5px; line-height: 18px; color: var(--text-2); } }
+.snaps { display: flex; flex-direction: column; gap: 6px; }
+.snap { align-items: center; padding: 8px 8px 8px 12px; .btn-outline.sm { height: 30px; padding: 0 12px; font-size: 12.5px; letter-spacing: 0.3px; } }
+.more { align-self: flex-start; border: 0; background: none; color: var(--primary-text); font: 600 12.5px var(--font); cursor: pointer; padding: 4px 2px; }
 </style>

@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { useDisplay } from 'vuetify';
 import { result, store, benchName } from '../store.ts';
 import { primaryBench } from '../composables/stats.ts';
-import { xirr } from '../engine/util.ts';
+import { addDays, xirr } from '../engine/util.ts';
 import { money, moneyAxis, pct } from '../format.ts';
 import PortfolioHeader from '../components/PortfolioHeader.vue';
 import PillToggle from '../components/PillToggle.vue';
@@ -14,6 +14,7 @@ import ShareButton from '../components/ShareButton.vue';
 import BenchmarkCards from '../components/BenchmarkCards.vue';
 import HoldingsChart from '../components/HoldingsChart.vue';
 import HoldingsTable from '../components/HoldingsTable.vue';
+
 
 const { mdAndUp } = useDisplay();
 type Mode = 'Value' | 'Return' | 'Gain' | 'Cash' | '%Off High';
@@ -89,6 +90,9 @@ const series = computed<TSeries[]>(() => {
 });
 
 const isPct = computed(() => mode.value === 'Return' || mode.value === '%Off High');
+// before the first transaction the chart is empty but still shows yesterday → today
+const emptyRange = computed<[string, string]>(() => [addDays(store.today, -1), store.today]);
+const hasHoldings = computed(() => !!result.value?.holdings.length);
 const valueFmt = (v: number) => (isPct.value ? pct(v) : money(v));
 const legend = computed(() => {
   const bn = benchName(primaryBench.value);
@@ -116,7 +120,7 @@ const METHOD_HELP = 'MWR (money-weighted, XIRR) counts the size and timing of yo
       </div>
     </div>
 
-    <TimeChart ref="tc" class="main-chart" :series="series" :height="mdAndUp ? 439 : 262" :legend-below="!mdAndUp" :show-y-axis="mode !== 'Value'" :y-formatter="isPct ? (v: number) => `${(v * 100).toFixed(0)}%` : (v: number) => moneyAxis(v)" :value-formatter="valueFmt">
+    <TimeChart ref="tc" class="main-chart" :series="series" :height="mdAndUp ? 439 : 262" :legend-below="!mdAndUp" :show-y-axis="mode !== 'Value'" :y-formatter="isPct ? (v: number) => `${(v * 100).toFixed(0)}%` : (v: number) => moneyAxis(v)" :value-formatter="valueFmt" :empty-range="emptyRange">
       <template #legend>
         <div class="legend">
           <span v-for="l in legend" :key="l.n" class="li"><i :class="l.t" :style="{ background: l.c }" />{{ l.n }}</span>
@@ -127,7 +131,7 @@ const METHOD_HELP = 'MWR (money-weighted, XIRR) counts the size and timing of yo
     <div class="bench-wrap"><BenchmarkCards /></div>
 
     <h2 class="section-title holdings-title">My Holdings</h2>
-    <HoldingsChart />
+    <HoldingsChart v-if="hasHoldings" />
     <div class="table-gap"><HoldingsTable /></div>
   </div>
 </template>

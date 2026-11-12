@@ -72,7 +72,7 @@ const targetProps = computed(() =>
     <div v-if="showCash && cashRow" class="rcard cash">
       <div class="c-name"><b>{{ cashRow.name }}</b></div>
       <div class="c-val">
-        <NumField class="cur-field" label="Current Value" :prefix="sym" :min="0" :model-value="cashValue" @update:model-value="rb.setCash($event)" />
+        <NumField class="cur-field" label="Current Value" :prefix="sym" :min="0" :model-value="Math.round(cashValue * 100) / 100" @update:model-value="rb.setCash($event)" />
       </div>
       <div class="c-alloc"><div class="lbl">Current Allocation</div><div class="val">{{ pct2(cashRow.currentPct) }}</div></div>
       <v-icon class="arrow">mdi-arrow-right-bold</v-icon>

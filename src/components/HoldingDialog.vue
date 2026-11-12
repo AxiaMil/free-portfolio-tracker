@@ -7,6 +7,8 @@ import { result, marketView, openAddTransaction } from '../store.ts';
 import { alloc, money, pct, price, shares, signClass, ccySymbol } from '../format.ts';
 import TimeChart from './TimeChart.vue';
 
+// axis labels stay short so large prices (property, indices) fit: 325k, 1.2M; small prices keep cents
+const axisPrice = (v: number) => { const a = Math.abs(v); return a >= 1e4 ? (v < 0 ? '-' : '') + (a >= 1e6 ? +(a / 1e6).toFixed(2) + 'M' : +(a / 1e3).toFixed(1) + 'k') : price(v); };
 const model = defineModel<string | null>({ default: null });
 const { mdAndUp } = useDisplay();
 const h = computed(() => result.value?.holdings.find((x) => x.symbol === model.value) ?? null);
@@ -38,7 +40,7 @@ const markers = computed(() => {
         <button class="close" aria-label="Close" @click="model = null"><v-icon>mdi-close</v-icon></button>
       </div>
       <v-card-text>
-        <TimeChart :series="[{ name: h.symbol, data: priceSeries, color: palette.portfolio, width: 2, gradient: palette.portfolioFill }]" :markers="markers" :height="mdAndUp ? 340 : 260" :zooms="['1M', '3M', '6M', 'YTD', '1Y', '3Y', '5Y', 'ALL']" initial-zoom="1Y" show-y-axis :y-formatter="(v: number) => price(v)" :value-formatter="(v: number) => price(v)" />
+        <TimeChart :series="[{ name: h.symbol, data: priceSeries, color: palette.portfolio, width: 2, gradient: palette.portfolioFill }]" :markers="markers" :height="mdAndUp ? 340 : 260" :zooms="['1M', '3M', '6M', 'YTD', '1Y', '3Y', '5Y', 'ALL']" initial-zoom="1Y" show-y-axis :y-formatter="axisPrice" :value-formatter="(v: number) => price(v)" />
         <div class="stats">
           <div><span>Shares</span><b>{{ shares(h.shares) }}</b></div>
           <div><span>Avg Cost</span><b>{{ price(h.avgCost) }}</b></div>

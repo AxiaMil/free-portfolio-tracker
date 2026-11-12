@@ -248,7 +248,7 @@ const SORT_OPTIONS = [
     <v-dialog :model-value="!!confirmRemove" max-width="420" @update:model-value="confirmRemove = null">
       <v-card class="pa-2">
         <v-card-title>Remove {{ confirmRemove }}?</v-card-title>
-        <v-card-text>This deletes every transaction for {{ confirmRemove }} from this portfolio. A backup of your data is kept in the data/backups folder.</v-card-text>
+        <v-card-text>This deletes every transaction for {{ confirmRemove }} from this portfolio. Earlier versions stay in Settings → Data & Backup → Automatic snapshots.</v-card-text>
         <v-card-actions><v-spacer /><v-btn variant="text" @click="confirmRemove = null">Cancel</v-btn><v-btn color="error" variant="flat" @click="doRemove">Remove</v-btn></v-card-actions>
       </v-card>
     </v-dialog>

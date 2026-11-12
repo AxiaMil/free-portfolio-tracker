@@ -41,18 +41,18 @@ const preview = computed(() => money(result.value?.value ?? 1234567.89));
 
     <div class="sec-h mt">Privacy</div>
     <div class="row">
-      <div>
+      <div class="grow">
         <div class="r-t">Hide values</div>
         <div class="r-d">Mask amounts and share counts everywhere (same as the eye icon next to "My Portfolio").</div>
       </div>
-      <v-switch v-model="hide" color="primary" hide-details inset density="compact" aria-label="Hide values" />
+      <v-switch v-model="hide" color="primary" hide-details inset density="compact" class="sw" aria-label="Hide values" />
     </div>
 
     <div class="sec-h mt">Avatar</div>
     <div class="row">
-      <div class="avatar">{{ prefs.userInitial || 'A' }}</div>
+      <div class="avatar"><template v-if="prefs.userInitial">{{ prefs.userInitial }}</template><v-icon v-else size="20">mdi-account</v-icon></div>
       <v-text-field v-model="initial" label="Initials" maxlength="2" density="compact" hide-details class="init" />
-      <div class="r-d">One or two letters shown in the round avatar.</div>
+      <div class="r-d">One or two letters shown on your profile in the menu.</div>
     </div>
   </div>
 </template>
@@ -67,5 +67,8 @@ const preview = computed(() => money(result.value?.value ?? 1234567.89));
 .preview { margin-top: 10px; font-size: 13px; color: var(--text-2); b { color: var(--text); font-weight: 600; } }
 .avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--nav-active-bg); color: var(--text); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; }
 .init { width: 120px; flex: none; }
+// the description wraps so the switch stays on screen at phone widths
+.grow { flex: 1; min-width: 0; }
+.sw { flex: none; }
 @media (max-width: 599px) { .opt { grid-template-columns: 28px 1fr; .o-note { grid-column: 2; } } }
 </style>

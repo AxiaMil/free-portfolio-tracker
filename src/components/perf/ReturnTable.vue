@@ -79,7 +79,6 @@ const KIND_HELP = 'MWR (money-weighted, XIRR) counts the size and timing of your
                 <span v-else :class="[signClass(r.annualized), { chip: best[TABLE_PERIODS.length] === ri && rows.length > 1 }]">{{ pct(r.annualized) }}</span>
               </td>
             </tr>
-            <tr v-if="!rows.length"><td :colspan="TABLE_PERIODS.length + 2" class="muted">No transactions yet.</td></tr>
           </tbody>
         </table>
       </div>

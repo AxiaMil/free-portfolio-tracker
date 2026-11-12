@@ -1,6 +1,6 @@
 // App icons: Lucide outline icons, used through Vuetify's icon system.
 // Templates (and Vuetify's own components) keep using `mdi-*` names; each name listed below is drawn with its
-// Lucide equivalent. Names that aren't listed (checkbox and radio marks) still use the Material Design font.
+// Lucide equivalent, and the checkbox / radio marks with the small filled SVGs below. No icon font is loaded.
 import { defineComponent, h, type Component } from 'vue';
 import type { IconSet } from 'vuetify';
 import {
@@ -10,10 +10,31 @@ import {
   Database, Download, Ellipsis, EllipsisVertical, Eye, EyeOff, FileChartColumn, FileSpreadsheet, FileText, Filter, Folder, FolderClock, Gem,
   Coins, House, Image, Info, LayoutDashboard, Lightbulb, List, ListFilter, LoaderCircle, Menu, Minus,
   Paperclip, Palette, Pencil, Pipette, Plus, ReceiptText, RefreshCcw, RefreshCw, Scale, Search, Settings, Share, ShieldHalf, SlidersHorizontal,
-  Target, Trash2, TriangleAlert, Wallet, X,
+  Target, Trash2, TriangleAlert, User, Wallet, X,
 } from 'lucide-vue-next';
 
+// filled checkbox and radio marks (the selected state reads at a glance, like the Material originals).
+// Shapes are plain data; the vnodes are created on every render (Vue can't reuse vnodes across renders).
+type Shape = [tag: string, attrs: Record<string, string | number>];
+const svg = (shapes: Shape[]) => defineComponent({
+  props: { size: { type: [String, Number], default: 24 }, strokeWidth: { type: [String, Number], default: undefined } },
+  setup: (p) => () => h('svg', { width: p.size, height: p.size, viewBox: '0 0 24 24', 'aria-hidden': 'true' }, shapes.map(([tag, attrs]) => h(tag, attrs))),
+});
+const box: Shape = ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 4, fill: 'currentColor' }];
+const ring: Shape = ['circle', { cx: 12, cy: 12, r: 8.5, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.9 }];
+const CheckboxOn = svg([box, ['path', { d: 'M7.5 12.3l3.1 3.1 5.9-6.6', fill: 'none', stroke: '#fff', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }]]);
+const CheckboxPartial = svg([box, ['path', { d: 'M8 12h8', stroke: '#fff', 'stroke-width': 2.2, 'stroke-linecap': 'round' }]]);
+const CheckboxOff = svg([['rect', { x: 4, y: 4, width: 16, height: 16, rx: 3.5, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.9 }]]);
+const RadioOn = svg([ring, ['circle', { cx: 12, cy: 12, r: 4.5, fill: 'currentColor' }]]);
+const RadioOff = svg([ring]);
+
 const MAP: Record<string, Component> = {
+  // selection marks
+  'mdi-checkbox-marked': CheckboxOn,
+  'mdi-checkbox-blank-outline': CheckboxOff,
+  'mdi-minus-box': CheckboxPartial,
+  'mdi-radiobox-marked': RadioOn,
+  'mdi-radiobox-blank': RadioOff,
   // navigation
   'mdi-home': House,
   'mdi-chart-areaspline-variant': ChartArea,
@@ -111,6 +132,7 @@ const MAP: Record<string, Component> = {
   'mdi-format-list-bulleted': List,
   'mdi-image-outline': Image,
   'mdi-bank': Banknote,
+  'mdi-account': User,
 };
 
 const AppIcon = defineComponent({
@@ -122,9 +144,10 @@ const AppIcon = defineComponent({
   setup(props) {
     return () => {
       const name = typeof props.icon === 'string' ? props.icon : '';
-      const svg = MAP[name];
-      if (svg) return h(props.tag, { class: 'app-icon' }, [h(svg, { size: '100%', strokeWidth: 1.9, 'aria-hidden': 'true' })]);
-      return h(props.tag, { class: ['mdi', name] });
+      const icon = MAP[name];
+      if (icon) return h(props.tag, { class: 'app-icon' }, [h(icon, { size: '100%', strokeWidth: 1.9, 'aria-hidden': 'true' })]);
+      if (import.meta.env.DEV && name) console.warn(`[icons] no icon mapped for ${name}`);
+      return h(props.tag, { class: 'app-icon' });
     };
   },
 });

@@ -13,6 +13,10 @@ import SectionAppearance from '../components/settings/SectionAppearance.vue';
 import SectionData from '../components/settings/SectionData.vue';
 import PortfolioSettings from '../components/settings/PortfolioSettings.vue';
 import { REPORTS, SECTIONS, sectionKey, type SectionKey } from '../components/settings/reports.ts';
+import { storageInfo } from '../platform/storage.ts';
+
+const info = storageInfo();
+const savedWhere = info.kind === 'browser' ? 'Saved in this browser' : info.kind === 'memory' ? 'Not saved: download a backup' : `Saved by ${info.label}`;
 
 const { mdAndUp } = useDisplay();
 const route = useRoute();
@@ -99,17 +103,20 @@ onMounted(() => {
   <!-- ================= phone: menu ================= -->
   <div v-else class="page mmenu">
     <div class="profile">
-      <div class="pav">{{ store.state?.preferences.userInitial || 'A' }}</div>
+      <div class="pav"><template v-if="store.state?.preferences.userInitial">{{ store.state.preferences.userInitial }}</template><v-icon v-else size="30">mdi-account</v-icon></div>
       <div class="pinfo">
         <div class="p1">Local profile</div>
         <div class="p2">{{ stats }}</div>
-        <div class="p2">Saved on this computer</div>
+        <div class="p2">{{ savedWhere }}</div>
       </div>
     </div>
     <nav class="mlist">
       <router-link v-for="it in PHONE_ITEMS" :key="it.key" :to="`/menu/${it.key}`" class="mi">
         <v-icon size="24">{{ it.icon }}</v-icon><span>{{ it.title }}</span><v-icon size="22" class="mchev">mdi-chevron-right</v-icon>
       </router-link>
+      <button class="mi" data-test="menu-help" @click="store.helpOpen = true">
+        <v-icon size="24">mdi-help-circle-outline</v-icon><span>Help &amp; FAQ</span><v-icon size="22" class="mchev">mdi-chevron-right</v-icon>
+      </button>
     </nav>
     <div class="divider" />
     <div class="mh">All reports</div>
@@ -146,6 +153,7 @@ onMounted(() => {
 .mlist { display: flex; flex-direction: column; }
 .profile + .mlist { margin-top: 23px; }
 .mi, .ri { display: flex; align-items: center; height: 41.5px; color: var(--text); text-decoration: none; font-size: 16px; .v-icon { color: var(--text); } }
+button.mi { width: 100%; padding: 0; border: 0; background: none; font: inherit; font-size: 16px; text-align: left; cursor: pointer; }
 .mi span { margin-left: 9px; flex: 1; }
 .ri span { margin-left: 13px; }
 .mi:active, .ri:active { opacity: 0.7; }

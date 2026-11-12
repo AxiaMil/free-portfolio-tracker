@@ -1,8 +1,8 @@
 <script setup lang="ts">
 const model = defineModel<boolean>({ default: false });
 const ITEMS = [
-  ['How are prices updated?', 'Live quotes refresh every minute and daily history every 10 minutes while you are online. Everything is cached in the data/cache folder, so the app keeps working offline with the last known prices.'],
-  ['Where is my data stored?', 'In data/portfolio.json inside the app folder. Earlier versions are kept in data/backups (one at most every 5 minutes while you edit, last 30 kept).'],
+  ['How are prices updated?', 'Live quotes refresh every minute and daily history every 10 minutes while you are online. Prices are cached in this browser, so the app keeps working offline with the last known prices.'],
+  ['Where is my data stored?', 'In this browser (or in the app the tracker runs inside, such as a Muse space). Nothing is uploaded anywhere else. Earlier versions are kept as automatic snapshots, and Settings → Data & Backup can download a backup file.'],
   ['Auto deposits', 'When a buy needs more cash than the portfolio holds, a deposit for the shortfall is added automatically (unless Margin & Short Selling is enabled). See Transactions → Adjusted.'],
   ['Auto dividends', 'Dividends are generated from market data using the shares you held on each ex-dividend date, paid on the pay date, minus your dividend tax rate. Turn this off in Settings → Portfolio Settings.'],
   ['MWR, TWR, SR', 'MWR (money-weighted / XIRR) includes the timing and size of your deposits. TWR (time-weighted) measures the investments only and is used for risk metrics. SR (simple return) = gain / invested capital.'],

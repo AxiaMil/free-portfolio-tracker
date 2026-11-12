@@ -4,25 +4,25 @@
 
 # Portfolio Tracker
 
-**A self-hosted, offline-first investment portfolio tracker.**
+**A private, offline-first investment portfolio tracker that runs entirely in your browser.**
 
-Performance, dividends, risk, allocation, goals and trade analysis, all computed on your own machine from your own transactions, with live market data.
+Performance, dividends, risk, allocation, goals and trade analysis, computed on your own device from your own transactions, with live market data. No server, no account. It runs on your computer, on any static host, or as a [Meta Muse](#run-it-on-meta-muse) space.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-4C8DFF.svg)](LICENSE)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org)
 [![Vuetify 3](https://img.shields.io/badge/Vuetify-3-1867C0?logo=vuetify&logoColor=white)](https://vuetifyjs.com)
 [![Vite 6](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vite.dev)
 [![ECharts 5](https://img.shields.io/badge/ECharts-5-AA344D?logo=apacheecharts&logoColor=white)](https://echarts.apache.org)
-[![Node ≥ 20](https://img.shields.io/badge/Node-%E2%89%A520-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
-[![Self-hosted](https://img.shields.io/badge/data-stays%20local-34D399)](#privacy)
+[![Static app](https://img.shields.io/badge/runs%20as-static%20files-339933)](docs/HOSTING.md)
+[![Data stays local](https://img.shields.io/badge/data-stays%20local-34D399)](#privacy)
 
-[Features](#features) · [Screenshots](#screenshots) · [Themes](#themes) · [Quick start](#quick-start) · [Import your trades](#import-your-trades) · [How it works](#how-the-numbers-are-calculated) · [FAQ](#faq)
+[Features](#features) · [Screenshots](#screenshots) · [Quick start](#quick-start) · [Meta Muse](#run-it-on-meta-muse) · [Import your trades](#import-your-trades) · [How it works](#how-the-numbers-are-calculated) · [FAQ](#faq)
 
 <br />
 
 <img src="docs/screenshots/home.png" alt="Home dashboard" width="100%" />
 
-<sub>All screenshots use the fictional demo portfolio that ships with the app.</sub>
+<sub>Screenshots show a fictional example portfolio. A fresh copy of the app starts empty.</sub>
 
 </div>
 
@@ -30,11 +30,12 @@ Performance, dividends, risk, allocation, goals and trade analysis, all computed
 
 ## Why
 
-Most portfolio trackers want an account, a subscription and a copy of every trade you have ever made. This one is a small Node server and a web app that you run yourself:
+Most portfolio trackers want an account, a subscription and a copy of every trade you have ever made. This one is a web app that keeps everything on your side:
 
-- **Your data never leaves your computer.** Transactions, settings and goals live in one JSON file in `data/`.
+- **Your data stays with you.** Transactions, settings and goals are saved in your browser (or in the app platform you run it on). Nothing is uploaded, and a one-click backup moves it anywhere.
 - **No account, no subscription, no telemetry.** The only outbound requests fetch prices, FX rates, dividends and company profiles from Yahoo Finance. They contain only the ticker symbols.
-- **Works offline.** Market data is cached on disk, so the app keeps working with the last known prices when you lose your connection.
+- **Starts from nothing.** A fresh copy opens with one empty portfolio. There is no sample data to delete.
+- **Works offline.** Market data is cached in the browser, so the app keeps working with the last known prices when you lose your connection.
 - **Proper investment maths.** Money-weighted (XIRR) and time-weighted returns, benchmark "what if" simulations, FIFO/average-cost lots, dividend withholding tax, splits and multi-currency FX.
 
 ## Features
@@ -51,7 +52,8 @@ Most portfolio trackers want an account, a subscription and a copy of every trad
 | **Rebalance** | Set target weights in % or currency and see exactly how much to buy or sell of each position. |
 | **Transactions** | Add trades by hand or import a CSV, then edit, bulk delete and export. An *Adjusted* ledger shows the deposits, dividends and taxes the app adds for you. Prices outside the day's trading range are flagged. |
 | **Custom assets** | Track anything without a ticker, such as property, private funds or crypto on an exchange Yahoo doesn't cover, with your own price history. |
-| **Everywhere** | Multiple portfolios and base currencies. Stock splits and minor-unit quotes (GBp, ZAc) handled. Hide-values privacy mode, a phone layout with bottom navigation, and PNG/CSV export of charts and tables. |
+| **Everywhere** | Multiple portfolios and base currencies. Stock splits and minor-unit quotes (GBp, ZAc) handled. Hide-values privacy mode and PNG/CSV export of charts and tables. On phones, a bottom navigation bar with floating **+** and refresh buttons that slide away while you scroll. |
+| **Your data** | Saved automatically on every change, with automatic snapshots you can restore. Download a JSON backup, restore it, or export every transaction as CSV. |
 | **Looks** | Three themes (Graphite, Midnight and Paper) plus any accent colour, switchable in *Settings → Appearance*. A web app manifest and icons let you add it to a phone's home screen. |
 
 ## Screenshots
@@ -90,7 +92,7 @@ Pick a theme in **Settings → Appearance**. Each one recolours the whole app, c
 
 ## Quick start
 
-You need **Node.js 20 or newer**.
+You need **Node.js 20 or newer** to build it. The app itself is plain static files.
 
 ```bash
 git clone https://github.com/AxiaMil/portfolio-tracker.git
@@ -99,24 +101,90 @@ npm install
 npm start
 ```
 
-Open **http://localhost:5178**. The first start creates `data/portfolio.json` from the demo portfolio in [`server/seed.json`](server/seed.json). Delete the demo trades in **Transactions** (or replace the file) and add your own.
+Open **http://localhost:5178**. The app starts empty, with one portfolio called *My Portfolio* in your region's currency. Press **+** to add your first transaction, or import a CSV.
 
 | Command | What it does |
 |---|---|
-| `npm start` | Builds the app and starts the local server on port 5178 |
-| `npm run serve` | Starts the server without rebuilding |
-| `npm run dev` | Development mode with hot reload on http://localhost:5173 |
-| `npm run build` | Builds the front end into `dist/` |
+| `npm start` | Builds the app and serves it on http://localhost:5178 |
+| `npm run dev` | Development mode with hot reload, same address |
+| `npm run build` | Builds the static app into `dist/` |
+| `npm run preview` | Serves the last build without rebuilding |
+| `npm run build:app` | Rebuilds the prebuilt drop-in copy in `app/` (used by Meta Muse) |
 
-### Configuration
+Set `PORT` to use another port. Both servers forward market-data requests to Yahoo Finance, because browsers can't call it directly.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `5178` | Port of the local server (in `npm run dev`, the port of the UI) |
-| `API_PORT` | `5178` | API server port used by `npm run dev` |
-| `PORTFOLIO_DATA_DIR` | `./data` | Where your portfolio, backups and market-data cache are stored |
+### Host it anywhere
 
-The server only listens on `127.0.0.1`, so it is not reachable from other machines on your network.
+`app/` (prebuilt) and `dist/` (your own build) work from any static host, at the domain root or in a sub-folder. Listed prices need one small forwarding route to Yahoo Finance. [docs/HOSTING.md](docs/HOSTING.md) covers the options: a reverse proxy, the `VITE_MARKET_PROXY` build setting, or a host platform's server function.
+
+## Run it on Meta Muse
+
+The tracker runs as a [Meta Muse](https://about.fb.com/news/2026/11/introducing-spaces-customize-muse-app/) space as a drop-in. The repository ships a prebuilt, tested copy in [`app/`](app). It is plain static files, so Muse has no build step, no dependencies and no app code to change. Muse only connects two services it already has, its storage and a server action, through one small file, `app/host.js`. Everything you then do in the space is managing your portfolio.
+
+**1. Create the space.** Paste this into Muse:
+
+```text
+Create a space that runs the ready-made web app in the app/ folder of
+https://github.com/AxiaMil/portfolio-tracker (MIT licence).
+
+The app is finished and tested. Treat app/ as a fixed, prebuilt asset:
+- Serve the files in app/ exactly as they are, as this space's whole front end, full screen.
+  app/index.html is the entry page and every path in it is relative. There is no build step.
+- Do not edit, rebuild, regenerate, restyle, translate, re-implement or port any of it to another
+  framework. If the space needs a page of its own, show app/index.html full screen in a frame with
+  nothing around it.
+- Do not add anything to the interface: no header, title bar, avatar, labels under the navigation
+  icons, banner, tips or notes. Do not add sample data. The app starts empty, as intended.
+
+The only file to write is app/host.js (empty by default). It connects the app to this space. Make it
+exactly this, replacing the three commented calls with this space's storage and the server action:
+
+window.portfolioHost = {
+  name: 'Muse space storage',
+  async loadState() {
+    // return the JSON saved in this space's storage under the key "portfolio", or null if none yet
+  },
+  async saveState(state) {
+    // save `state` (one JSON object, the whole portfolio) in this space's storage under "portfolio"
+  },
+  async fetchJson(url) {
+    // return await yahooGet(url)  (the server action below)
+  },
+};
+
+Server action yahooGet(url): HTTP GET the url and return the parsed JSON body (also when the status is
+not 200). Only accept URLs that start with https://query1.finance.yahoo.com/ or
+https://query2.finance.yahoo.com/, and reject everything else. No API key, cookies or login.
+
+Network access: query1.finance.yahoo.com and query2.finance.yahoo.com only.
+Nothing else is needed: no database, no login, no scheduled jobs. While it is open the app refreshes
+prices every minute and caches them itself.
+
+When it is ready, check that Home shows 0.00 with an empty chart, that the + button opens "Manage
+Transaction", that adding "Buy AAPL, 10 shares" shows a value within a few seconds, that
+Settings → Data & Backup says "Muse space storage", and that reloading the space keeps the transaction.
+```
+
+**2. Approve the two Yahoo Finance domains** when Muse's Sentinel asks. Prices, dividends and FX rates come from there, and only ticker symbols are sent.
+
+**3. Bring your data (optional).** In your old copy, use **Settings → Data & Backup → Download backup**. In the Muse space, use **Restore from file**. You can also import a CSV from **Transactions**.
+
+If Muse changed the look anyway, send this follow-up:
+
+```text
+Undo every change you made to the tracker. Serve the files in app/ from
+https://github.com/AxiaMil/portfolio-tracker exactly as they are. The only file you write is
+app/host.js (space storage and the yahooGet server action). No extra header, title, avatar,
+navigation labels, banners or notes.
+```
+
+What you get in the space is the same app as here, on phone and computer:
+- **All features:** every page and tool.
+- **Phone layout:** bottom navigation, with + and refresh buttons that slide away while you scroll.
+- **Saving:** automatic, with snapshots you can restore.
+- **Offline:** the last known prices are kept.
+
+The first visit loads about 500 KB (compressed). After that, the files are cached.
 
 ## Import your trades
 
@@ -181,50 +249,59 @@ Date,Action,Ticker,Shares,Price,Currency,Commission,Note
 
 | What | Where it goes |
 |---|---|
-| Transactions, portfolios, goals, preferences | `data/portfolio.json` on your disk only |
-| Backups | `data/backups/`: at most one every 5 minutes while you edit, last 30 kept |
-| Ticker symbols and FX pairs | Sent to Yahoo Finance to fetch prices, dividends, splits and company profiles |
-| Market data | Cached in `data/cache/` |
+| Transactions, portfolios, goals, preferences | Your browser's storage for this site (`localStorage`), or the host's storage when one is connected, as in Meta Muse |
+| Automatic snapshots | IndexedDB in your browser: at most one every 5 minutes while you edit, the last 30 kept. Restore them in *Settings → Data & Backup* |
+| Ticker symbols and FX pairs | Sent to Yahoo Finance to fetch prices, dividends, splits and company profiles. No cookies, no account |
+| Market data | Cached in IndexedDB in your browser |
 
-`data/` is in `.gitignore`, so a fork or clone of this repository never contains your portfolio.
+Nothing about you is in this repository. Your portfolio lives only where you run the app. Download a backup from *Settings → Data & Backup* to keep a copy or move it to another browser.
 
 ## Project structure
 
 ```
-├── server/            Express server: state storage, Yahoo Finance proxy + disk cache
-│   └── seed.json      Demo portfolio used on first start
+├── app/               Prebuilt drop-in copy of the app (static files, used by Meta Muse)
+├── public/
+│   └── host.js        Optional host bridge (storage + market data) for platforms such as Meta Muse
 ├── src/
 │   ├── engine/        Pure TypeScript portfolio engine (ledger, lots, returns, risk, dividends, goals, trades)
+│   ├── market/        Yahoo Finance client: plain fetch(), route discovery, IndexedDB cache
+│   ├── platform/      Where data is saved: browser storage, host storage, automatic snapshots
 │   ├── pages/         One page per route
 │   ├── components/    Charts, tables, dialogs and per-page components
+│   ├── composables/   Shared derived stats and UI behaviour
 │   ├── plugins/       Vuetify setup and the Lucide icon set
 │   ├── styles/        Global styles built on the theme's CSS variables
 │   ├── theme.ts       Design tokens and chart colours for each theme
 │   ├── store.ts       App state, market-data loading and auto refresh
 │   └── format.ts      Money / percentage formatting
-├── scripts/dev.mjs    Runs the API server and Vite together
-└── docs/screenshots/  Images used in this README
+└── docs/
+    ├── HOSTING.md     Static hosting, the host bridge and Meta Muse
+    └── screenshots/   Images used in this README
 ```
 
-The engine in `src/engine/` has no UI dependencies. It takes your transactions plus market data and produces a daily series, holdings, lots and dividend events. Every page is a view over that result.
+The engine in `src/engine/` has no UI dependencies. It takes your transactions plus market data and produces a daily series, holdings, lots and dividend events. Every page is a view over that result. Storage and market data each sit behind one small module (`src/platform/storage.ts`, `src/market/client.ts`), so the app can move to another host without touching the rest.
 
 ## Tech stack
 
-[Vue 3](https://vuejs.org) · [Vuetify 3](https://vuetifyjs.com) · [Vite](https://vite.dev) · [Apache ECharts](https://echarts.apache.org) via [vue-echarts](https://github.com/ecomfe/vue-echarts) · [Express](https://expressjs.com) · [yahoo-finance2](https://github.com/gadicc/node-yahoo-finance2) · [Lucide](https://lucide.dev) icons · [Geist](https://vercel.com/font) font
+[Vue 3](https://vuejs.org) · [Vuetify 3](https://vuetifyjs.com) · [Vite](https://vite.dev) · [Apache ECharts](https://echarts.apache.org) via [vue-echarts](https://github.com/ecomfe/vue-echarts) · [Lucide](https://lucide.dev) icons · [Geist](https://vercel.com/font) font. No back end: market data comes from Yahoo Finance's public endpoints over plain `fetch()`.
 
 ## FAQ
 
 **Is this financial advice?** No. It is a bookkeeping and analytics tool. Check important numbers against your broker statements.
 
-**Prices look stale.** Quotes refresh every minute and daily history every 10 minutes while the app is open. The refresh button in the top bar forces an update. It turns amber when the app is showing cached prices because Yahoo Finance could not be reached.
+**Where did my data go when I opened it in another browser?** Each browser keeps its own copy. Use *Settings → Data & Backup → Download backup* in one, then *Restore from file* in the other.
+
+**Prices look stale, or the refresh button is amber.** Quotes refresh every minute and daily history every 10 minutes while the app is open. The refresh button (top right on a computer, above the bottom bar on a phone) forces an update. It turns amber when Yahoo Finance can't be reached and cached prices are shown. On a static host, prices need the forwarding route described in [docs/HOSTING.md](docs/HOSTING.md).
 
 **A ticker isn't found.** Search uses Yahoo Finance symbols. For anything Yahoo doesn't cover, create a **Custom Asset** and enter prices yourself.
 
-**Can I run it on a home server?** Yes. Put it behind a reverse proxy with authentication, because the app has no login of its own. By default it only listens on `127.0.0.1`.
+**Upcoming dividends look approximate.** Yahoo's public endpoints don't include announced ex-dates. Upcoming payments are projected from the last 12 months, and the country of a holding comes from its exchange.
+
+**Can I run it on a home server?** Yes. Serve `dist/` with any web server and forward the Yahoo routes (see [docs/HOSTING.md](docs/HOSTING.md)). Each browser still keeps its own data, so put it behind authentication if others can reach it.
 
 ## Disclaimer
 
-Market data comes from Yahoo Finance through the unofficial `yahoo-finance2` library. It is intended for personal use and may be delayed or inaccurate. This project is not affiliated with Yahoo or any broker.
+Market data comes from Yahoo Finance's public, unofficial endpoints. It is intended for personal use and may be delayed or inaccurate. This project is not affiliated with Yahoo or any broker.
 
 ## License
 

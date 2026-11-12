@@ -21,8 +21,9 @@ export function returnTable(
   series: DayPoint[], today: string, inception: string | null, method: Method,
   benches: Array<{ symbol: string; name: string }>, kind: ReturnKind,
 ): ReturnRow[] {
-  if (!series.length) return [];
   const rows = [{ id: 'portfolio', name: 'Portfolio', acc: portfolioAccessor }, ...benches.map((b) => ({ id: b.symbol, name: b.name, acc: benchAccessor(b.symbol) }))];
+  // no history yet: the same rows, every cell "-"
+  if (!series.length) return rows.map((r) => ({ id: r.id, name: r.name, cells: TABLE_PERIODS.map(() => null), annualized: null }));
   return rows.map((r) => {
     const cells = TABLE_PERIODS.map(({ key }) => {
       if (!periodAvailable(key, today, inception)) return null;
@@ -62,7 +63,13 @@ export interface BucketRow {
   excess: number | null; // portfolio minus benchmark return
 }
 
-export function historical(series: DayPoint[], bucket: Bucket, method: Method, bench: string): BucketRow[] {
+export function historical(series: DayPoint[], bucket: Bucket, method: Method, bench: string, today?: string): BucketRow[] {
+  // no history yet: just the current period, with no values
+  if (!series.length) {
+    if (!today) return [];
+    const key = bucket === 'Annually' ? today.slice(0, 4) : bucket === 'Quarterly' ? `${today.slice(0, 4)}-Q${Math.ceil(Number(today.slice(5, 7)) / 3)}` : today.slice(0, 7);
+    return [{ key, start: today, end: today, port: null, bench: null, excess: null }];
+  }
   const p = bucketReturns(series, bucket, method, portfolioAccessor);
   const b = bucketReturns(series, bucket, method, benchAccessor(bench));
   return p.map((x, i) => {

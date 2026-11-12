@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { getCharts } from '../market/client.ts';
 // "Manage Transaction" (step 1: choose portfolio) -> "Add Transactions" (step 2: editable rows + CSV upload).
 import { computed, reactive, ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
@@ -68,8 +69,7 @@ async function autofillPrice(r: Row) {
   try {
     let chart = market.value.charts[r.symbol];
     if (!chart) {
-      const res = await fetch(`/api/charts?symbols=${encodeURIComponent(r.symbol)}`).then((x) => x.json());
-      chart = res[r.symbol];
+      chart = (await getCharts([r.symbol]))[r.symbol];
       if (chart?.bars?.length) market.value = { ...market.value, charts: { ...market.value.charts, [r.symbol]: chart } };
     }
     const bars = chart?.bars ?? [];

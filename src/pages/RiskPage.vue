@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Risk: pain / efficiency / exposure summary for a period, a drawdown or rolling-metric chart and the metric x period table.
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 import { benchName, result } from '../store.ts';
-import { primaryBench } from '../composables/stats.ts';
+import { primaryBench, riskPeriods } from '../composables/stats.ts';
 import { riskMetrics } from '../engine/risk.ts';
 import { periodBaseDate, type PeriodKey } from '../engine/periods.ts';
 import { num, pct, shortDate, signClass } from '../format.ts';
@@ -13,8 +13,8 @@ import RiskChart from '../components/risk/RiskChart.vue';
 import RiskTable from '../components/risk/RiskTable.vue';
 
 const { mdAndUp } = useDisplay();
-const PERIODS: PeriodKey[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'All'];
 const period = ref<PeriodKey>('All');
+watch(riskPeriods, (ps) => { if (!ps.includes(period.value)) period.value = 'All'; });
 type Group = 'Pain' | 'Efficiency' | 'Exposure';
 const tab = ref<Group>('Pain');
 
@@ -29,11 +29,33 @@ interface Kpi { label: string; help?: string; sub: string; subValue?: string; va
 const DASH = '–';
 const ratio = (v: number | null | undefined) => (v == null || !isFinite(v) ? DASH : num(v, 2));
 
+/** before there is any history: the same grid, every measure dashed (beta's reference stays 1.00) */
+function emptyGroups(b: string): Array<{ title: Group; rows: Kpi[] }> {
+  const vs = `vs ${b}`;
+  return [
+    { title: 'Pain', rows: [
+      { label: 'Max drawdown', help: 'Largest fall from a previous high to a low (time-weighted, so deposits and withdrawals do not count).', sub: `Trough ${DASH}`, value: DASH, cls: '' },
+      { label: 'Current drawdown', sub: 'From all-time high, today', value: DASH, cls: '' },
+      { label: 'Longest drawdown', sub: 'Longest stretch below a peak', value: '0d', cls: '' },
+    ] },
+    { title: 'Efficiency', rows: [
+      { label: 'Sharpe ratio', help: 'Annualized return divided by annualized volatility. Higher means more return for each unit of risk.', sub: vs, subValue: DASH, value: DASH, cls: '' },
+      { label: 'Sortino ratio', help: 'Like Sharpe, but only counts downside volatility (falling days).', sub: vs, subValue: DASH, value: DASH, cls: '' },
+      { label: 'Calmar ratio', help: 'Annualized return (CAGR) divided by the size of the maximum drawdown.', sub: vs, subValue: DASH, value: DASH, cls: '' },
+    ] },
+    { title: 'Exposure', rows: [
+      { label: 'Volatility (ann.)', sub: vs, subValue: DASH, value: DASH, cls: '' },
+      { label: 'Beta', help: `How much the portfolio tends to move when ${b} moves 1%. 1.00 = same as the market.`, sub: vs, subValue: '1.00', value: DASH, cls: '' },
+      { label: 'Alpha (ann.)', sub: `Excess over ${b}`, value: DASH, cls: '' },
+    ] },
+  ];
+}
+
 const groups = computed<Array<{ title: Group; rows: Kpi[] }>>(() => {
   const x = m.value;
-  if (!x) return [];
-  const ok = x.enough;
   const b = bn.value;
+  if (!x) return emptyGroups(b);
+  const ok = x.enough;
   return [
     {
       title: 'Pain',
@@ -79,7 +101,7 @@ function csv() {
           <template #activator="{ props }">
             <button v-bind="props" class="outline-btn pbtn">Period: {{ period }} <v-icon size="16">mdi-chevron-down</v-icon></button>
           </template>
-          <v-list density="compact"><v-list-item v-for="p in PERIODS" :key="p" :active="period === p" @click="period = p">{{ p }}</v-list-item></v-list>
+          <v-list density="compact"><v-list-item v-for="p in riskPeriods" :key="p" :active="period === p" @click="period = p">{{ p }}</v-list-item></v-list>
         </v-menu>
         <ShareButton icon :csv="csv" filename="risk-summary" label="Export summary" />
       </div>
@@ -89,7 +111,7 @@ function csv() {
       <button v-for="g in (['Pain', 'Efficiency', 'Exposure'] as const)" :key="g" class="gtab" :class="{ active: tab === g }" @click="tab = g">{{ g }}</button>
     </div>
 
-    <div v-if="m" class="kpis">
+    <div class="kpis">
       <div v-for="g in visibleGroups" :key="g.title" class="kcol">
         <div v-if="mdAndUp" class="ktitle">{{ g.title }}</div>
         <div v-for="r in g.rows" :key="r.label" class="krow">
@@ -101,7 +123,6 @@ function csv() {
         </div>
       </div>
     </div>
-    <div v-else class="muted mt-8">Not enough history yet.</div>
 
     <RiskChart class="sec-chart" />
     <RiskTable class="sec-table" />

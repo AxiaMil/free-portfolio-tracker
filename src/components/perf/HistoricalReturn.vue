@@ -24,8 +24,8 @@ const bench = computed(() => primaryBench.value);
 const bn = computed(() => benchName(bench.value));
 const rows = computed<BucketRow[]>(() => {
   const r = result.value;
-  if (!r || !r.series.length) return [];
-  return historical(r.series, bucket.value, store.method, bench.value);
+  if (!r) return [];
+  return historical(r.series, bucket.value, store.method, bench.value, r.today);
 });
 const full = computed(() => HEAT_FULL[bucket.value]);
 

@@ -1,4 +1,3 @@
-import '@mdi/font/css/materialdesignicons.css';
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
 import { aliases } from 'vuetify/iconsets/mdi';

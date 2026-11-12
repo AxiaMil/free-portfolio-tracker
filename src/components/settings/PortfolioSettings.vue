@@ -111,7 +111,7 @@ function doDelete() {
 
     <ConfirmDialog v-model="delOpen" :title="`Delete ${delFor?.name}?`" confirm-text="Delete" @confirm="doDelete">
       <p class="mt-0">Its {{ delFor?.transactions.length }} transactions, {{ delFor?.customAssets.length }} custom assets, goal plan and rebalance targets will be removed.</p>
-      <p class="mb-0">A copy of your previous data is kept in data/backups.</p>
+      <p class="mb-0">Earlier versions stay in Settings → Data & Backup → Automatic snapshots.</p>
     </ConfirmDialog>
   </div>
 </template>

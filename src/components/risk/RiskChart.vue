@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { palette, alpha } from '../../theme.ts';
 // Risk chart: drawdown from peak, or a rolling (3-month) volatility / Sharpe / Sortino / beta / alpha line.
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 import { benchName, result } from '../../store.ts';
-import { primaryBench } from '../../composables/stats.ts';
+import { primaryBench, riskPeriods } from '../../composables/stats.ts';
 import { drawdownSeries, rollingSeries } from '../../engine/risk.ts';
 import { periodBaseDate, type PeriodKey } from '../../engine/periods.ts';
 import { lastIndexLE } from '../../engine/util.ts';
@@ -16,12 +16,12 @@ import ShareButton from '../ShareButton.vue';
 
 type Metric = 'Drawdown' | 'Volatility' | 'Sharpe' | 'Sortino' | 'Beta' | 'Alpha';
 const METRICS: Metric[] = ['Drawdown', 'Volatility', 'Sharpe', 'Sortino', 'Beta', 'Alpha'];
-const PERIODS: PeriodKey[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'All'];
 const WINDOW = 63; // trading days = 3 months
 
 const { mdAndUp } = useDisplay();
 const metric = ref<Metric>('Drawdown');
 const period = ref<PeriodKey>('All');
+watch(riskPeriods, (ps) => { if (!ps.includes(period.value)) period.value = 'All'; });
 const tc = ref();
 const chartRef = computed(() => tc.value?.chart);
 
@@ -94,7 +94,7 @@ const legend = computed(() => {
       </div>
       <div class="periods">
         <span class="plabel">Period</span>
-        <button v-for="p in PERIODS" :key="p" class="per" :class="{ active: period === p }" @click="period = p">{{ p }}</button>
+        <button v-for="p in riskPeriods" :key="p" class="per" :class="{ active: period === p }" @click="period = p">{{ p }}</button>
       </div>
     </template>
     <template v-else>
@@ -111,7 +111,7 @@ const legend = computed(() => {
         <span class="slabel">Period:</span>
         <v-menu location="bottom start">
           <template #activator="{ props }"><button v-bind="props" class="outline-btn sel">{{ period }} <v-icon size="16">mdi-chevron-down</v-icon></button></template>
-          <v-list density="compact"><v-list-item v-for="p in PERIODS" :key="p" :active="period === p" @click="period = p">{{ p }}</v-list-item></v-list>
+          <v-list density="compact"><v-list-item v-for="p in riskPeriods" :key="p" :active="period === p" @click="period = p">{{ p }}</v-list-item></v-list>
         </v-menu>
       </div>
     </template>

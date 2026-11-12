@@ -1,5 +1,6 @@
 // Rebalance calculator: current vs target value for cash, every holding and any asset added as a new target.
 // Settings live in activePortfolio.rebalance (saved to disk by the store's deep watcher).
+import { getQuotes } from '../../market/client.ts';
 import { computed, shallowRef, watch } from 'vue';
 import { activePortfolio, market, result, store, toast } from '../../store.ts';
 import { MarketView, fxSymbol, normalizeCurrency } from '../../engine/market.ts';
@@ -36,15 +37,13 @@ export interface RRow {
 
 const DEFAULT: RebalanceSettings = { mode: 'pct', targets: {}, extraAssets: [] };
 
-// quotes for added assets the portfolio does not hold (and their FX pairs), fetched from the local server
+// quotes for added assets the portfolio does not hold (and their FX pairs)
 const extraQuotes = shallowRef<Record<string, Quote>>({});
 const inflight = new Set<string>();
 
 async function fetchQuotes(symbols: string[]): Promise<Record<string, Quote>> {
   if (!symbols.length) return {};
-  const r = await fetch(`/api/quotes?symbols=${symbols.map(encodeURIComponent).join(',')}`);
-  if (!r.ok) throw new Error(String(r.status));
-  return (await r.json()).quotes ?? {};
+  return (await getQuotes(symbols)).quotes;
 }
 
 async function loadExtraQuotes(symbols: string[], base: string) {
@@ -160,7 +159,8 @@ export function useRebalance() {
   function setCash(value: number | null) {
     const rb = ensure();
     if (!rb) return;
-    if (value == null || !isFinite(value) || Math.abs(value - actualCash.value) < 1e-9) delete rb.cashValue;
+    // the field shows cents, so a value within half a cent of the real cash means "no override"
+    if (value == null || !isFinite(value) || Math.abs(value - actualCash.value) < 0.005) delete rb.cashValue;
     else rb.cashValue = Math.max(0, value);
   }
 

@@ -5,7 +5,8 @@ import { moneyCompact, pct, signClass } from '../../format.ts';
 import HelpTip from '../HelpTip.vue';
 
 defineProps<{ stats: TradeStats; benchLabel: string }>();
-const rate = (r: number | null) => pct(r, { sign: false });
+// with no lots the rate reads 0.00%, not "-"
+const rate = (r: number | null, lots: number) => pct(lots ? r : 0, { sign: false });
 </script>
 
 <template>
@@ -17,12 +18,12 @@ const rate = (r: number | null) => pct(r, { sign: false });
     </div>
     <div class="kpi">
       <div class="k-lbl">WIN RATE <HelpTip icon="mdi-information" :size="15" text="Share of lots with a positive total gain (price and currency change, dividends and realized gains, after fees)." /></div>
-      <div class="k-val">{{ rate(stats.winRate) }}</div>
+      <div class="k-val">{{ rate(stats.winRate, stats.lots) }}</div>
       <div class="k-sub">{{ stats.wins }}W / {{ stats.losses }}L</div>
     </div>
     <div class="kpi">
       <div class="k-lbl">WIN RATE VS {{ benchLabel.toUpperCase() }} <HelpTip icon="mdi-information" :size="15" :text="`Share of lots whose money-weighted return beat ${benchLabel} over the same holding period (both measured in your portfolio currency).`" /></div>
-      <div class="k-val">{{ rate(stats.benchWinRate) }}</div>
+      <div class="k-val">{{ rate(stats.benchWinRate, stats.lots) }}</div>
       <div class="k-sub">{{ stats.benchWins }}W / {{ stats.benchLosses }}L</div>
     </div>
     <div class="kpi">
