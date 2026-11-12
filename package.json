@@ -36,5 +36,17 @@
     "typescript": "^7.0.2",
     "vite": "^6.4.6",
     "vite-plugin-vuetify": "^2.1.3"
-  }
+  },
+  "keywords": [
+    "portfolio-tracker",
+    "free-portfolio-tracker",
+    "stock-portfolio-tracker",
+    "dividend-tracker",
+    "investment-tracker",
+    "meta-muse",
+    "muse-space",
+    "personal-finance",
+    "open-source",
+    "vue"
+  ]
 }

@@ -2,12 +2,16 @@
 
 <img src="public/logo.svg" alt="Portfolio Tracker logo" width="72" height="72" />
 
-# Portfolio Tracker for Meta Muse
+# Free Portfolio Tracker for Meta Muse
 
-**A complete investment portfolio tracker, built to run as your own [Meta Muse](https://about.fb.com/news/2026/11/introducing-spaces-customize-muse-app/) space.**
+**A free, open-source stock, ETF and dividend portfolio tracker that runs in your own [Meta Muse](https://about.fb.com/news/2026/11/introducing-spaces-customize-muse-app/) space.**
 
-Paste one prompt into Muse and you get a private tracker for your investments. It shows performance, dividends, risk, allocation, goals and trade analysis, on your phone and computer, with live market data. Muse copies the finished space from this repository, so you write and change no code.
+Track all your investments in one place, on your phone and computer, with live prices. It covers returns against the S&P 500 and other benchmarks, dividend income with a payment calendar, risk, allocation, goals and every trade.
 
+It's free and open source (MIT), with no subscription, premium tier, ads or limits on portfolios and transactions. To set it up, you paste one prompt into Muse. Muse copies the finished space from this repository, so you write no code.
+
+[![Free](https://img.shields.io/badge/price-free-34D399)](#is-it-really-free)
+[![No subscription](https://img.shields.io/badge/subscription-none-34D399)](#is-it-really-free)
 [![Built for Meta Muse](https://img.shields.io/badge/built%20for-Meta%20Muse-0866FF)](#get-it-in-meta-muse)
 [![License: MIT](https://img.shields.io/badge/license-MIT-4C8DFF.svg)](LICENSE)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org)
@@ -15,11 +19,11 @@ Paste one prompt into Muse and you get a private tracker for your investments. I
 [![ECharts 5](https://img.shields.io/badge/ECharts-5-AA344D?logo=apacheecharts&logoColor=white)](https://echarts.apache.org)
 [![Data stays in your space](https://img.shields.io/badge/data-stays%20in%20your%20space-34D399)](#privacy)
 
-[Get it in Muse](#get-it-in-meta-muse) · [Features](#features) · [Screenshots](#screenshots) · [How it runs](#how-it-runs-in-muse) · [Import your trades](#import-your-trades) · [How it works](#how-the-numbers-are-calculated) · [FAQ](#faq) · [Development](#development)
+[Get it in Muse](#get-it-in-meta-muse) · [Features](#features) · [What it tracks](#what-you-can-track) · [Screenshots](#screenshots) · [How it runs](#how-it-runs-in-muse) · [Import your trades](#import-your-trades) · [How it works](#how-the-numbers-are-calculated) · [FAQ](#faq) · [Development](#development)
 
 <br />
 
-<img src="docs/screenshots/mobile.png" alt="Portfolio Tracker on a phone" width="100%" />
+<img src="docs/screenshots/mobile.png" alt="Free portfolio tracker app on a phone" width="100%" />
 
 <sub>Screenshots show a fictional example portfolio. A new space starts empty.</sub>
 
@@ -28,6 +32,8 @@ Paste one prompt into Muse and you get a private tracker for your investments. I
 ---
 
 ## Get it in Meta Muse
+
+Setting up the free tracker takes one prompt. You don't need to code, install anything or create another account.
 
 **1. Create the space.** Paste this into Muse:
 
@@ -104,10 +110,11 @@ Do not change the app or add anything around it.
 
 </details>
 
-## Why
+## Why use this free portfolio tracker
 
-Most portfolio trackers want an account, a subscription and a copy of every trade you have ever made. This one lives in your own Muse space:
+Most portfolio trackers want an account, a monthly subscription and a copy of every trade you have ever made. This one is free and lives in your own Muse space:
 
+- **Free and open source.** It is MIT licensed, with no subscription, premium tier, ads or limits on portfolios, holdings or transactions. Every feature below is included.
 - **Ready-made for Muse.** The finished space is in this repository. Muse copies it; nothing is designed, generated or rewritten, so every space gets the same tested app.
 - **Your data stays in your space.** Transactions, settings and goals are saved in your space's own storage. Nothing else receives them, and a one-click backup gives you a copy whenever you want.
 - **No extra accounts, keys or subscriptions.** The only outside requests fetch prices, FX rates, dividends and company profiles from Yahoo Finance. They contain only ticker symbols.
@@ -117,6 +124,8 @@ Most portfolio trackers want an account, a subscription and a copy of every trad
 - **Proper investment maths.** Money-weighted (XIRR) and time-weighted returns, benchmark "what if" simulations, FIFO/average-cost lots, dividend withholding tax, splits and multi-currency FX.
 
 ## Features
+
+Everything here is part of the free app:
 
 | | |
 |---|---|
@@ -134,25 +143,36 @@ Most portfolio trackers want an account, a subscription and a copy of every trad
 | **Your data** | Saved automatically on every change, with automatic snapshots you can restore. Download a JSON backup, restore it, or export every transaction as CSV. |
 | **Looks** | Three themes (Graphite, Midnight and Paper) plus any accent colour, switchable in *Settings → Appearance*. |
 
+## What you can track
+
+| | |
+|---|---|
+| **Stocks and ETFs** | Anything with a Yahoo Finance symbol, on most of the world's exchanges: the US (`AAPL`, `VOO`), Singapore (`BN4.SI`), Hong Kong (`0700.HK`), London (`VUSA.L`), Europe (`ASML.AS`), Japan, Australia, Canada and more |
+| **Funds, REITs and indices** | Mutual funds, REITs and indices listed on Yahoo Finance. Any index can also be a benchmark, such as the S&P 500 (`^GSPC`) |
+| **Crypto** | Coins with a Yahoo Finance symbol, such as `BTC-USD`. Anything else can be a custom asset |
+| **Dividends** | Added automatically from each holding's dividend history, with your withholding tax taken off, or entered yourself |
+| **Cash and currencies** | Deposits, withdrawals, fees, taxes and interest. Choose from 21 base currencies (USD, SGD, EUR, GBP, HKD, JPY, AUD and more), with daily FX conversion |
+| **Everything else** | Property, private funds, bonds or savings, as custom assets with prices you enter |
+
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="Home dashboard on a computer" width="100%" />
+  <img src="docs/screenshots/home.png" alt="Portfolio tracker dashboard on a computer: portfolio value, benchmark comparison and performance chart" width="100%" />
   <br /><b>Home, on a computer</b>
 </p>
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/performance.png" alt="Performance" /><p align="center"><b>Performance</b></p></td>
-    <td width="50%"><img src="docs/screenshots/risk.png" alt="Risk" /><p align="center"><b>Risk</b></p></td>
+    <td width="50%"><img src="docs/screenshots/performance.png" alt="Portfolio performance compared with the S&amp;P 500, NASDAQ and other benchmarks" /><p align="center"><b>Performance</b></p></td>
+    <td width="50%"><img src="docs/screenshots/risk.png" alt="Portfolio risk metrics: drawdown, volatility, Sharpe, Sortino, beta and alpha" /><p align="center"><b>Risk</b></p></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/allocation.png" alt="Allocation" /><p align="center"><b>Allocation</b></p></td>
-    <td width="50%"><img src="docs/screenshots/dividends.png" alt="Dividends" /><p align="center"><b>Dividends</b></p></td>
+    <td width="50%"><img src="docs/screenshots/allocation.png" alt="Portfolio allocation by holding, sector, country and asset type" /><p align="center"><b>Allocation</b></p></td>
+    <td width="50%"><img src="docs/screenshots/dividends.png" alt="Dividend tracker: projected dividend income, yield, yield on cost and payment calendar" /><p align="center"><b>Dividends</b></p></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/trade-analysis.png" alt="Trade analysis" /><p align="center"><b>Trade analysis</b></p></td>
-    <td width="50%"><img src="docs/screenshots/goal-tracker.png" alt="Goal tracker" /><p align="center"><b>Goal tracker</b></p></td>
+    <td width="50%"><img src="docs/screenshots/trade-analysis.png" alt="Trade analysis: gain, return and alpha for every lot, with win rate" /><p align="center"><b>Trade analysis</b></p></td>
+    <td width="50%"><img src="docs/screenshots/goal-tracker.png" alt="Investment goal tracker: actual portfolio value against the planned path" /><p align="center"><b>Goal tracker</b></p></td>
   </tr>
 </table>
 
@@ -331,23 +351,57 @@ The engine in `src/engine/` has no UI dependencies. It takes your transactions p
 
 ## FAQ
 
-**Is this financial advice?** No. It is a bookkeeping and analytics tool. Check important numbers against your broker statements.
+### Is it really free?
 
-**Do I need to code or change anything?** No. Paste the prompt in [Get it in Meta Muse](#get-it-in-meta-muse). Muse copies the finished space, and you approve the two Yahoo Finance domains. If Muse changes the look anyway, send the follow-up prompt under that section.
+Yes. The tracker is open source under the MIT licence. There's no subscription, premium tier, ads or usage limit, and it never asks for payment. All you need is a Meta Muse space to run it in.
 
-**Is my data the same on my phone and my computer?** Yes. It is saved in your space, so every device that opens the space sees the same portfolio.
+### Do I need to know how to code?
 
-**Prices look stale, or the refresh button is amber.** While the app is open, quotes refresh every minute and daily history every 10 minutes. The space refreshes its snapshot every 10 minutes even when the app is closed. The refresh button (top right on a computer, above the bottom bar on a phone) forces an update. It turns amber when Yahoo Finance can't be reached and the last known prices are shown.
+No. Paste the prompt in [Get it in Meta Muse](#get-it-in-meta-muse), and approve the two Yahoo Finance domains when asked. Muse copies the finished space. If Muse changes the look anyway, send the follow-up prompt under that section.
 
-**The first open of a new space waited for prices.** Until `refreshMarketCache` has run once, the snapshot is empty and the very first open downloads prices, with a count. After that, the space opens at once.
+### Can I import my trades from my broker?
 
-**A ticker isn't found.** Search uses Yahoo Finance symbols. For anything Yahoo doesn't cover, create a **Custom Asset** and enter prices yourself.
+Yes, from any broker or spreadsheet that exports trades as CSV. Column names are matched loosely, and the separators are detected automatically. See [Import your trades](#import-your-trades) for the format, or download the template from the upload screen. You can also add trades by hand.
 
-**Upcoming dividends look approximate.** Yahoo's public endpoints don't include announced ex-dates. Upcoming payments are projected from the last 12 months, and the country of a holding comes from its exchange.
+### Which markets and currencies does it support?
 
-**Why are my dividends lower than what my holdings pay?** With a dividend tax rate set (*Settings → Portfolio Settings*), the Dividends page shows what you receive after withholding. The headline shows the gross amount, the tax and the net.
+Any stock, ETF, fund, index or coin with a Yahoo Finance symbol, on most exchanges worldwide. A portfolio can use any of 21 base currencies. Every holding and dividend is converted at that day's FX rate. For anything Yahoo doesn't list, create a **Custom Asset** and enter prices yourself.
 
-**Can I run it outside Muse?** Yes. See [Development](#development) and [docs/HOSTING.md](docs/HOSTING.md). Outside Muse, each browser keeps its own copy of your data.
+### Is my portfolio private?
+
+Your transactions are saved in your own Muse space and nowhere else. The only outside requests send ticker symbols to Yahoo Finance to fetch prices. See [Privacy](#privacy).
+
+### Is my data the same on my phone and my computer?
+
+Yes. It is saved in your space, so every device that opens the space sees the same portfolio.
+
+### Is this financial advice?
+
+No. It is a bookkeeping and analytics tool. Check important numbers against your broker statements.
+
+### Prices look stale, or the refresh button is amber.
+
+While the app is open, quotes refresh every minute and daily history every 10 minutes. The space also refreshes its snapshot every 10 minutes while the app is closed. The refresh button (top right on a computer, above the bottom bar on a phone) forces an update. It turns amber when Yahoo Finance can't be reached, and the last known prices are shown.
+
+### The first open of a new space waited for prices.
+
+Until `refreshMarketCache` has run once, the snapshot is empty, so the very first open downloads prices and shows a count. After that, the space opens at once.
+
+### A ticker isn't found.
+
+Search uses Yahoo Finance symbols. For anything Yahoo doesn't cover, create a **Custom Asset** and enter prices yourself.
+
+### Upcoming dividends look approximate.
+
+Yahoo's public endpoints don't include announced ex-dates, so upcoming payments are projected from the last 12 months. The country of a holding comes from its exchange.
+
+### Why are my dividends lower than what my holdings pay?
+
+With a dividend tax rate set (*Settings → Portfolio Settings*), the Dividends page shows what you receive after withholding. The headline shows the gross amount, the tax and the net.
+
+### Can I run it outside Muse?
+
+Yes. See [Development](#development) and [docs/HOSTING.md](docs/HOSTING.md). Outside Muse, each browser keeps its own copy of your data.
 
 ## Disclaimer
 
