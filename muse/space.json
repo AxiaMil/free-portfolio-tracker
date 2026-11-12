@@ -1,0 +1,15 @@
+{
+  "runtime": "typescript",
+  "platformVersion": 28,
+  "entry": "client/dist/index.html",
+  "name": "Portfolio Tracker",
+  "slug": "portfolio-tracker",
+  "managedCronJobs": [
+    {
+      "id": "portfolio-tracker-market-refresh-10m",
+      "action": "refreshMarketCache",
+      "args": {},
+      "schedule": { "kind": "interval", "every": "10m" }
+    }
+  ]
+}

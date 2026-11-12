@@ -2,8 +2,9 @@
 // loads prices through `npm run dev` / `npm start`, or straight from Yahoo Finance where the runtime allows it.
 //
 // An app platform (for example a Meta Muse space) connects its own storage and a server-side fetch by defining
-// window.portfolioHost here, or on a same-origin page that shows the app in a frame. Nothing else in the app
-// changes. Every member is optional. Full contract: docs/HOSTING.md
+// window.portfolioHost here, on its own page before the one-file build (portfolio-tracker.js), or on a
+// same-origin page that shows the app in a frame. Nothing else in the app changes. Every member is optional.
+// Full contract: docs/HOSTING.md
 //
 // window.portfolioHost = {
 //   name: 'Muse space storage',
@@ -13,4 +14,7 @@
 //   async saveState(state) {},
 //   // GET an https://query1|query2.finance.yahoo.com URL on the server side and return the parsed JSON
 //   async fetchJson(url) { const r = await fetch(url); return r.json(); },
+//   // optional: market data kept between visits ([{ key, data, fetchedAt }]), so a new device opens at once
+//   async loadMarketCache(since) { return []; },
+//   async saveMarketCache(entries) {},
 // };

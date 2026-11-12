@@ -116,6 +116,7 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
   const autoEntries: LedgerEntry[] = [];
   const dividendEvents: DividendEvent[] = [];
   const firstDate = user.length ? user[0].date : today;
+  const taxRate = (p.dividendTaxRate || 0) / 100;
   if (p.autoDividend) {
     for (const sym of assetSymbols) {
       if (m.custom.has(sym)) continue;
@@ -131,24 +132,24 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
         const received = payDate <= today;
         const fx = m.fxAt(ccy, received ? payDate : today);
         const amountLocal = perShare * shares;
-        dividendEvents.push({ symbol: sym, exDate, payDate, perShare, shares, currency: ccy, amountBase: amountLocal * fx, status: received ? 'received' : 'confirmed' });
+        dividendEvents.push({ symbol: sym, exDate, payDate, perShare, shares, currency: ccy, amountBase: amountLocal * fx, taxBase: amountLocal * fx * taxRate, status: received ? 'received' : 'confirmed' });
         const entry: LedgerEntry = {
           id: `auto-div-${sym}-${exDate}`, date: payDate, action: 'Dividend', symbol: sym, price: perShare, currency: ccy, shares,
           commission: 0, commissionBase: 0, amountBase: amountLocal * fx, fx, auto: 'dividend', status: received ? 'confirmed' : 'upcoming',
         };
         autoEntries.push(entry);
-        const rate = (p.dividendTaxRate || 0) / 100;
-        if (rate > 0) {
+        if (taxRate > 0) {
           autoEntries.push({
-            id: `auto-tax-${sym}-${exDate}`, date: payDate, action: 'Taxes', symbol: 'CASH', price: 1, currency: ccy, shares: amountLocal * rate,
-            commission: 0, commissionBase: 0, amountBase: amountLocal * rate * fx, fx, auto: 'tax', status: received ? 'confirmed' : 'upcoming',
+            id: `auto-tax-${sym}-${exDate}`, date: payDate, action: 'Taxes', symbol: 'CASH', price: 1, currency: ccy, shares: amountLocal * taxRate,
+            commission: 0, commissionBase: 0, amountBase: amountLocal * taxRate * fx, fx, auto: 'tax', status: received ? 'confirmed' : 'upcoming',
           });
         }
       }
     }
   }
   for (const e of user.filter((x) => x.action === 'Dividend' && x.symbol !== 'CASH')) {
-    dividendEvents.push({ symbol: e.symbol, exDate: e.date, payDate: e.date, perShare: e.price, shares: e.shares, currency: e.currency, amountBase: e.amountBase, status: 'received' });
+    // entered by hand: recorded as received, with no automatic withholding
+    dividendEvents.push({ symbol: e.symbol, exDate: e.date, payDate: e.date, perShare: e.price, shares: e.shares, currency: e.currency, amountBase: e.amountBase, taxBase: 0, status: 'received' });
   }
 
   // ---------- merge + auto deposits ----------
@@ -409,7 +410,8 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
     const known = upcoming.filter((u) => u.symbol === sym);
     if (prof?.exDividendDate && prof.exDividendDate > today && lastAmt > 0 && !known.some((k) => Math.abs(daysBetween(k.exDate, prof.exDividendDate!)) < 20)) {
       const payDate = prof.dividendDate && prof.dividendDate >= prof.exDividendDate ? prof.dividendDate : addDays(prof.exDividendDate, lag);
-      const ev: DividendEvent = { symbol: sym, exDate: prof.exDividendDate, payDate, perShare: lastAmt, shares: h.shares, currency: h.currency, amountBase: lastAmt * h.shares * fxNow, status: 'confirmed' };
+      const amountBase = lastAmt * h.shares * fxNow;
+      const ev: DividendEvent = { symbol: sym, exDate: prof.exDividendDate, payDate, perShare: lastAmt, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'confirmed' };
       upcoming.push(ev);
       known.push(ev);
     }
@@ -420,7 +422,8 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       if (known.some((k) => Math.abs(daysBetween(k.exDate, projEx)) < 25)) continue;
       const payDate = addDays(projEx, lag);
       if (payDate > horizon) continue;
-      upcoming.push({ symbol: sym, exDate: projEx, payDate, perShare: amt, shares: h.shares, currency: h.currency, amountBase: amt * h.shares * fxNow, status: 'estimated' });
+      const amountBase = amt * h.shares * fxNow;
+      upcoming.push({ symbol: sym, exDate: projEx, payDate, perShare: amt, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'estimated' });
     }
   }
   const dividends = [...dividendEvents.filter((d) => d.status === 'received'), ...upcoming].sort((a, b) => a.payDate.localeCompare(b.payDate));

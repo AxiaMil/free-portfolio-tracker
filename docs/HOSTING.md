@@ -9,10 +9,26 @@ The app reaches outside the browser in only two places. A host platform can take
 | **Saving your data** | This browser's `localStorage`, falling back to IndexedDB | [`src/platform/storage.ts`](../src/platform/storage.ts) |
 | **Market data** (Yahoo Finance) | The `./yahoo/…` route that `npm run dev` / `npm start` forwards | [`src/market/client.ts`](../src/market/client.ts) |
 
-Both are switched through one optional object, `window.portfolioHost`. Define it in either place:
+Both are switched through one optional object, `window.portfolioHost`. Define it in any of these places:
 
 - in `host.js`, next to `index.html` ([`public/host.js`](../public/host.js), or `app/host.js` in the prebuilt copy), which the app loads before its own code. As shipped it holds only comments and changes nothing;
+- on the page itself, before the [one-file build](#the-one-file-build) runs;
 - or on a same-origin page that shows the app in a frame. The app looks at its parent page too, so no file of the app has to change.
+
+## The one-file build
+
+Some platforms take a front end as a single script rather than a folder of files. For them, `npm run build:app` also writes [`app/portfolio-tracker.js`](../app/portfolio-tracker.js): the whole app (code, styles and the Geist fonts as data URLs) in one classic script of about 2.2 MB, 690 KB compressed. It requests no other file, so it works the same whether it is served from a folder, embedded in another bundle or loaded from a `blob:` URL.
+
+Any page can run it, in `<head>` or `<body>`. When the page has no `<div id="app">` it adds one at the end of `<body>`, and it adds a viewport tag if there is none. Define `window.portfolioHost` before it:
+
+```html
+<script>
+  window.portfolioHost = { name: 'My platform storage', loadState, saveState, fetchJson }; // see below
+</script>
+<script src="portfolio-tracker.js"></script>
+```
+
+[`app/portfolio-tracker.html`](../app/portfolio-tracker.html) is a ready page that does this, reading the bridge from `host.js` next to it.
 
 ## The host bridge
 
@@ -30,13 +46,24 @@ window.portfolioHost = {
 
   // GET a Yahoo Finance URL on the server side and return the parsed JSON body
   async fetchJson(url) { /* … */ },
+
+  // market data the host keeps between visits (raw Yahoo responses), and fresh responses to keep
+  async loadMarketCache(since) { /* … */ },
+  async saveMarketCache(entries) { /* … */ },
 };
 ```
 
 Every member is optional:
 
 - **`loadState` and `saveState`** must be defined together. The app then reads and writes only through them and never touches `localStorage`. The state is one JSON document, typically 10–200 KB. Its shape is `AppState` in [`src/engine/types.ts`](../src/engine/types.ts): `{ version, activePortfolioId, preferences, portfolios[] }`.
-- **`fetchJson(url)`** is the first route the app tries for market data. It receives full `https://query1.finance.yahoo.com/…` or `https://query2.finance.yahoo.com/…` URLs. Return the parsed JSON (Yahoo answers errors as JSON too, so pass those through). Throw only when the request itself fails. The app then tries its other routes and, failing those, shows cached prices with the refresh button in amber.
+- **`fetchJson(url)`** is the first route the app tries for market data. It receives full `https://query1.finance.yahoo.com/…` or `https://query2.finance.yahoo.com/…` URLs. Return the parsed JSON (Yahoo answers errors as JSON too, so pass those through). Throw only when the request itself fails. The app retries a failed request once after 0.7 s. It then tries its other routes and, failing those, shows cached prices with the refresh button in amber.
+- **`loadMarketCache(since)`** lets a new device open at once, without waiting for market data. It returns raw Yahoo responses as `[{ key, data, fetchedAt }]` (or `{ entries }`).
+  - Keys: `chart:<SYMBOL>` (the chart response), `spark:<SYM,SYM,…>` (a quote response for up to 20 symbols) and `search:<SYMBOL>` (the profile search response).
+  - `since` is roughly when the device last had live data (0 the first time). Entries fetched before it can be left out.
+  - The app parses each entry exactly like a live answer and keeps it wherever it is newer than the device's own copy. It never waits for the cache longer than 2 s.
+- **`saveMarketCache(entries)`** receives the same kind of entries: fresh quotes and profiles the open app fetched. They arrive at most every 15 s, 60 per call, and right away when the page is hidden. Saving them is best effort; errors are ignored.
+
+If the saved state can't be read (`loadState` throws, or takes more than 30 s), the app shows that with a **Try again** button. It never starts empty over existing data.
 
 The TypeScript contract is in [`src/platform/host.ts`](../src/platform/host.ts).
 
@@ -64,26 +91,36 @@ export async function fetchYahooJson(url) {
 }
 ```
 
-The app limits itself to four requests at a time. It caches history for 10 minutes, quotes for 45 seconds and profiles for 3 days, all in IndexedDB. While it is open it refreshes quotes every minute and history every 10 minutes. No scheduled job is needed on the host.
+How the app requests market data:
+- It makes at most six requests at a time, price histories first and company profiles last.
+- It never asks for the same data twice at once. Chart URLs differ only in their time window, so they are matched by symbol.
+- It caches history for 10 minutes, quotes for 45 seconds and profiles for 3 days, all in IndexedDB.
+- While it is open, it refreshes quotes every minute and history every 10 minutes. No scheduled job is needed on the host, though a host can keep a `loadMarketCache` snapshot fresh with one.
+
+When everything it needs is cached on the device or in the host's market cache, however old, the app opens on those prices at once and brings them up to date in the background. Otherwise it waits for the network, with a count of the price histories as they arrive. That only happens on a device's first open, with no host cache.
 
 ## Running on Meta Muse
 
-A Muse space can run a front end plus server actions with their own storage. It cannot run a Node server, a long-running process or files on disk. That maps onto the bridge directly:
+A Muse space can run a front end plus server actions, with its own storage and scheduled jobs. It cannot run a Node server, a long-running process or files on disk. The finished space is in [`muse/`](../muse): Muse copies it as [`muse/manifest.json`](../muse/manifest.json) lists it, and [`muse/README.md`](../muse/README.md) explains it.
 
-| Tracker needs | Muse provides |
+| Tracker needs | In the space |
 |---|---|
-| The prebuilt front end (`app/`, served as it is) | The space's front end |
-| `loadState` / `saveState` | The space's own storage, holding one JSON document |
-| `fetchJson` | A server action that GETs the URL and returns JSON. Muse's Sentinel will ask you to approve `query1.finance.yahoo.com` and `query2.finance.yahoo.com` |
+| The front end | `app/portfolio-tracker.js` copied byte for byte, run by a page that holds only `#app` |
+| `loadState` / `saveState` | `getPortfolio` / `savePortfolio`: one JSON document under `portfolio` in the `app_state` table |
+| `fetchJson` | `yahooGet`: allow-listed to `query1.finance.yahoo.com` and `query2.finance.yahoo.com`, which Muse's Sentinel asks you to approve |
+| `loadMarketCache` / `saveMarketCache` | `getSnapshot` / `saveSnapshotEntries` on the `market_cache` table |
+| A snapshot fresh while the app is closed | `refreshMarketCache` every 10 minutes ([`muse/space.json`](../muse/space.json)) |
 
-The copy-and-paste prompt is in the README under [Run it on Meta Muse](../README.md#run-it-on-meta-muse). It tells Muse three things:
-- serve `app/` unchanged;
-- write only `app/host.js`;
-- add one allow-listed `yahooGet` server action.
+The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on.
 
-These were tested end to end against the prebuilt copy on a plain static server, at phone and laptop widths:
-- With the bridge, saving goes only to the host and prices come only through `fetchJson`.
-- Without a bridge, the app still works fully on browser storage, and shows prices as offline until a route exists.
+These were tested end to end at phone and laptop widths, with the one file loaded from a `blob:` URL on a page that had no `#app` element and no viewport tag. Every server-action call took 250 ms:
+- **Opening:** a new device opened on the host's market snapshot in about 0.5 s, with no live request before the first paint. A device with its own cache opened in about 0.3 s. With no snapshot and no cache, the first open took about 2 s, with a count.
+- **While open:** only stale data was fetched live: the quotes, in one request. They were then saved back to the snapshot.
+- **Storage:** saving went only to the host, and nothing was written to `localStorage`. No file other than the script was requested.
+- **History:** navigation, including Back, kept working in a document that refuses `history.pushState`.
+- **Load failure:** an unreadable saved portfolio showed **Try again**, and nothing was saved over it.
+- **Every page and dialog** was checked at 360, 390, 768 and 1512 px wide, both empty and with data.
+- **Other builds:** the multi-file `app/` folder was tested the same way. Without a bridge, the app still works fully on browser storage, and shows prices as offline until a route exists.
 
 The UI already fits Muse's phone view:
 

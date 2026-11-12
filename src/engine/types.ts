@@ -243,6 +243,9 @@ export interface DividendEvent {
   perShare: number;
   shares: number;
   currency: string;
+  /** gross amount in the base currency */
   amountBase: number;
+  /** withholding tax on it in the base currency (the portfolio's dividend tax rate; 0 for dividends you entered) */
+  taxBase: number;
   status: 'received' | 'confirmed' | 'estimated';
 }

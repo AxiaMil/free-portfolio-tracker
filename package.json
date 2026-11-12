@@ -2,7 +2,7 @@
   "name": "portfolio-tracker",
   "private": true,
   "version": "1.0.0",
-  "description": "Offline-first investment portfolio tracker that runs as a static web app: performance, dividends, risk, allocation and goal tracking with live market data.",
+  "description": "Investment portfolio tracker built to run as a Meta Muse space: performance, dividends, risk, allocation and goal tracking with live market data.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -15,9 +15,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:app": "vite build --outDir app --emptyOutDir",
+    "build:app": "vite build --outDir app --emptyOutDir && vite build --mode single",
     "start": "vite build && vite preview",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

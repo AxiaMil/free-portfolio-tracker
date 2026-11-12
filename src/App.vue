@@ -37,6 +37,7 @@ const isActive = (to: string) => (to === '/allocation' ? route.path === '/alloca
 async function onRefresh() {
   await refreshMarket(true);
 }
+const reload = () => location.reload();
 watch(() => route.path, () => { store.helpOpen = false; });
 // apply the saved theme + accent on startup and whenever they change; pages remount so charts pick up new colours
 const themeName = ref<string>(DEFAULT_THEME);
@@ -108,9 +109,13 @@ watchEffect(() => { themeName.value = applyAppearance(store.state?.preferences.t
       <div v-if="store.loading" class="loading">
         <v-progress-circular indeterminate color="primary" size="44" />
         <div class="muted mt-4">Your performance is being updated</div>
+        <!-- only the first open on a device downloads every price history; later opens start from the cache -->
+        <div v-if="store.progress.total > 1" class="muted tnum load-count" aria-live="polite">Loading prices: {{ Math.min(store.progress.done, store.progress.total) }} of {{ store.progress.total }}</div>
       </div>
-      <div v-else-if="store.error" class="loading">
-        <div class="neg">Could not load your saved data: {{ store.error }}</div>
+      <div v-else-if="store.error" class="loading fail" role="alert">
+        <div class="fail-t">Your portfolio couldn't be loaded</div>
+        <div class="muted fail-d">Nothing was changed or saved over it. ({{ store.error }})</div>
+        <button class="outline-btn" @click="reload">Try again</button>
       </div>
       <router-view v-else v-slot="{ Component }">
         <component :is="Component" :key="route.path.startsWith('/menu') ? 'menu' : themeName" />
@@ -264,6 +269,10 @@ $ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 .snack-up :deep(.v-snackbar__wrapper) { margin-bottom: calc(68px + env(safe-area-inset-bottom)); }
 .loading { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.load-count { margin-top: 4px; font-size: 12.5px; }
+.fail { gap: 10px; padding: 0 24px; text-align: center; }
+.fail-t { font-size: 17px; font-weight: 600; }
+.fail-d { max-width: 420px; font-size: 13.5px; line-height: 20px; margin-bottom: 6px; }
 .bottom-nav {
   position: fixed;
   left: 0;

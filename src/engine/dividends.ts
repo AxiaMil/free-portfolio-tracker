@@ -1,5 +1,7 @@
 // Dividend analytics for the Dividends page: growth-adjusted projections, 12-month windows,
 // headline yields, ticker x month pivots and chart buckets. Pure functions over the engine result.
+// Every amount here is net of the portfolio's withholding tax (what actually reaches the portfolio's cash);
+// the gross amount and the tax are kept on each event so the page can show gross - withholding = net.
 import type { EngineResult } from './portfolio.ts';
 import type { MarketView } from './market.ts';
 import type { DividendEvent } from './types.ts';
@@ -8,6 +10,10 @@ import { addDays, addMonths, addYears, daysBetween } from './util.ts';
 export type DivLabel = 'Received' | 'Confirmed' | 'Estimated' | 'Estimated*';
 
 export interface DivEvent extends DividendEvent {
+  /** net amount in the base currency: gross - withholding */
+  amountBase: number;
+  /** gross amount before withholding, in the base currency */
+  grossBase: number;
   key: string;
   upcoming: boolean;
   label: DivLabel;
@@ -50,8 +56,11 @@ export function buildDividendEvents(r: EngineResult, m: MarketView): DivEvent[] 
       if (!growth.has(d.symbol)) growth.set(d.symbol, dividendGrowth(m, d.symbol, r.today));
       g = growth.get(d.symbol)!;
     }
-    const amountBase = d.amountBase * g;
-    const perShare = d.perShare * g;
+    const grossBase = d.amountBase * g;
+    const taxBase = (d.taxBase ?? 0) * g;
+    const amountBase = grossBase - taxBase;
+    const netShare = grossBase ? amountBase / grossBase : 1;
+    const perShare = d.perShare * g * netShare;
     const prof = m.profile(d.symbol);
     let label: DivLabel = 'Received';
     if (d.status === 'confirmed') label = prof?.dividendDate ? 'Confirmed' : 'Estimated*';
@@ -60,6 +69,8 @@ export function buildDividendEvents(r: EngineResult, m: MarketView): DivEvent[] 
       ...d,
       perShare,
       amountBase,
+      grossBase,
+      taxBase,
       key: `${d.symbol}-${d.exDate}-${i}`,
       upcoming: d.status !== 'received',
       label,
@@ -107,7 +118,11 @@ export function historicalWindow(events: DivEvent[], today: string, yearsBack = 
 }
 
 export interface DivSummary {
+  /** net income in the window (after withholding) */
   total: number;
+  /** the same before withholding, and the tax withheld: gross - withheld = total */
+  gross: number;
+  withheld: number;
   /** growth vs the comparison window (null when there is nothing to compare with) */
   yoy: number | null;
   yieldTTM: number;
@@ -135,8 +150,11 @@ export function summarize(events: DivEvent[], r: EngineResult, mode: 'Upcoming' 
   for (const e of window.events) by.set(e.symbol, (by.get(e.symbol) ?? 0) + e.amountBase);
   const held = new Set(r.holdings.map((h) => h.symbol));
   const payers = new Set([...upcomingWindow(events, r.today).events, ...past.events].map((e) => e.symbol).filter((s) => held.has(s)));
+  const withheld = window.events.reduce((a, e) => a + e.taxBase, 0);
   return {
     total,
+    gross: total + withheld,
+    withheld,
     yoy: prev > 0 ? total / prev - 1 : null,
     prev,
     yieldTTM: r.value ? total / r.value : 0,

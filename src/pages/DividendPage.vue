@@ -3,7 +3,7 @@ import { palette, alpha } from '../theme.ts';
 // Dividends: projected / trailing income, yields, payout calendar, history chart and ticker tables.
 import { computed, ref } from 'vue';
 import { useDisplay } from 'vuetify';
-import { marketView, result, store } from '../store.ts';
+import { activePortfolio, marketView, result, store } from '../store.ts';
 import { bucketize, buildDividendEvents, summarize, type Freq } from '../engine/dividends.ts';
 import { ccySymbol, hidden, money, num, pct, signClass } from '../format.ts';
 import PillToggle from '../components/PillToggle.vue';
@@ -28,6 +28,8 @@ const events = computed(() => (r.value ? buildDividendEvents(r.value, marketView
 const s = computed(() => (r.value ? summarize(events.value, r.value, mode.value) : null));
 const buckets = computed(() => bucketize(events.value, freq.value));
 const sym = computed(() => ccySymbol(store.base));
+// amounts on this page are net of the portfolio's dividend withholding tax; the headline shows the sum
+const taxRate = computed(() => activePortfolio.value?.dividendTaxRate ?? 0);
 const big = (v: number, d = 0) => (hidden() ? '••••••' : num(v, d));
 
 const donutItems = computed(() => {
@@ -79,6 +81,7 @@ const bucketCsv = () => [['Period', 'Received', 'Upcoming', 'Total'], ...buckets
               <template #activator="{ props: a }"><v-icon v-bind="a" size="17" class="info" :class="signClass(s.yoy)">mdi-information</v-icon></template>
             </v-tooltip>
           </div>
+          <div v-if="s.withheld > 0" class="net-math tnum" data-test="div-net-math">Gross {{ money(s.gross) }} − {{ +taxRate.toFixed(2) }}% withholding {{ money(s.withheld) }} = net {{ money(s.total) }}</div>
         </div>
         <div class="stats">
           <div class="stat">
@@ -161,6 +164,7 @@ const bucketCsv = () => [['Period', 'Received', 'Upcoming', 'Total'], ...buckets
 .proj .value { margin-top: -1px; }
 .yoy { margin-top: -1px; font-size: 14px; line-height: 21px; display: inline-flex; align-items: center; gap: 3px; }
 .info { cursor: help; }
+.net-math { margin-top: 4px; font-size: 12.5px; line-height: 18px; color: var(--muted); }
 .stats { display: grid; grid-template-columns: 1fr 1fr; row-gap: 27px; padding-top: 46px; }
 .stat { text-align: center; }
 .sl { font-size: 14px; line-height: 21px; color: var(--text); }

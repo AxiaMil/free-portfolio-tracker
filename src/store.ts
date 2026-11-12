@@ -6,7 +6,7 @@ import { computePortfolio, type EngineResult } from './engine/portfolio.ts';
 import type { PeriodKey } from './engine/periods.ts';
 import { todayLocal, uid } from './engine/util.ts';
 import { freshState, loadState, newPortfolio, requestPersistence, saveState } from './platform/storage.ts';
-import { getCharts, getProfiles, getQuotes, search } from './market/client.ts';
+import { cachedCharts, cachedProfiles, cachedQuotes, getCharts, getProfiles, getQuotes, search, seedFromHost } from './market/client.ts';
 
 export { newPortfolio };
 
@@ -19,6 +19,8 @@ export const benchName = (s: string) => BENCH_NAMES[s] ?? s;
 export const store = reactive({
   state: null as AppState | null,
   loading: true,
+  /** price histories ready / needed, shown while the very first open on a device downloads them */
+  progress: { done: 0, total: 0 },
   error: '' as string,
   refreshing: false,
   offline: false,
@@ -109,7 +111,9 @@ function fxPairs(symbols: string[]): string[] {
 
 async function loadCharts(symbols: string[], force = false) {
   if (!symbols.length) return;
-  const charts = await getCharts(symbols, { force });
+  const counting = store.loading;
+  if (counting) store.progress.total += symbols.length;
+  const charts = await getCharts(symbols, { force, onEach: counting ? () => { store.progress.done++; } : undefined });
   market.value = { ...market.value, charts: { ...market.value.charts, ...charts } };
   if (Object.values(charts).some((c) => c.stale)) store.offline = true;
 }
@@ -129,15 +133,19 @@ async function loadProfiles(symbols: string[], force = false) {
   market.value = { ...market.value, profiles: { ...market.value.profiles, ...profiles } };
 }
 
-export async function refreshMarket(force = false) {
+/**
+ * Brings market data up to date. By default only symbols not loaded yet (e.g. after adding a transaction);
+ * `all` checks every symbol against its cache age, `force` downloads everything again (the refresh button).
+ */
+export async function refreshMarket(force = false, all = false) {
   const { assets, benches } = neededSymbols();
+  const pick = (list: string[], have: Record<string, unknown>) => list.filter((s) => force || all || !have[s]);
   store.refreshing = true;
   try {
-    const missingCharts = [...assets, ...benches].filter((s) => force || !market.value.charts[s]);
-    await Promise.all([loadCharts(missingCharts.length ? missingCharts : [], force), loadProfiles(assets.filter((s) => force || !market.value.profiles[s]), false)]);
+    // price histories first: the numbers on screen depend on them; FX pairs follow once currencies are known
+    await loadCharts(pick([...assets, ...benches], market.value.charts), force);
     const fx = fxPairs([...assets, ...benches]);
-    const missingFx = fx.filter((s) => force || !market.value.charts[s]);
-    await loadCharts(missingFx, force);
+    await loadCharts(pick(fx, market.value.charts), force);
     await loadQuotes([...assets, ...benches, ...fx], force);
     store.today = todayLocal();
   } catch (e) {
@@ -146,6 +154,29 @@ export async function refreshMarket(force = false) {
   } finally {
     store.refreshing = false;
   }
+  // company details (name, sector, country) come last, so they never hold up prices; nothing waits for them
+  loadProfiles(pick(assets, market.value.profiles)).catch((e) => console.warn('profiles failed', e));
+}
+
+/**
+ * Puts what this device has cached in place, however old, so the portfolio shows at once. True when every
+ * price history it needs was there; otherwise the app waits for the download (only the first open on a device).
+ */
+async function openFromCache(): Promise<boolean> {
+  const { assets, benches } = neededSymbols();
+  const symbols = [...assets, ...benches];
+  if (!symbols.length) return true;
+  const charts = await cachedCharts(symbols);
+  if (Object.keys(charts).length < symbols.length) return false;
+  market.value = { ...market.value, charts }; // FX pairs depend on the currencies these report
+  const fx = fxPairs(symbols);
+  const fxCharts = await cachedCharts(fx);
+  if (Object.keys(fxCharts).length < fx.length) return false;
+  const [quotes, profiles] = await Promise.all([cachedQuotes([...symbols, ...fx]), cachedProfiles(assets)]);
+  market.value = { charts: { ...charts, ...fxCharts }, quotes, profiles };
+  const times = Object.values(quotes).map((q) => q.fetchedAt).filter(Boolean);
+  if (times.length) store.lastUpdated = Math.max(...times);
+  return true;
 }
 
 /** periodic: quotes every 60s, full daily history every 10 min */
@@ -165,19 +196,46 @@ function startTimers() {
   }, 60_000);
 }
 
+/** how long the saved portfolio may take to arrive before the app says so (it never starts empty instead) */
+const LOAD_TIMEOUT_MS = 30_000;
+/** how long the first paint waits for a host's saved market data while the portfolio is already here */
+const HOST_CACHE_WAIT_MS = 2_000;
+
+const within = <T>(p: Promise<T>, ms: number, message: string) => Promise.race([
+  p,
+  new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+]);
+
 export async function init() {
+  // a host's saved market data loads alongside the portfolio
+  const hostCache = seedFromHost();
   try {
-    // first run starts empty: one portfolio, no transactions
-    store.state = (await loadState()) ?? freshState();
+    // first run starts empty: one portfolio, no transactions. If the saved data can't be read, stop here
+    // (nothing is saved over it) and say so, with a way to try again.
+    store.state = (await within(loadState(), LOAD_TIMEOUT_MS, 'the saved portfolio took too long to load')) ?? freshState();
     requestPersistence();
     loaded = true;
     watch(() => store.state, scheduleSave, { deep: true });
     // new symbols (e.g. after adding a transaction) trigger a fetch
     watch(() => `${neededSymbols().assets.join(',')}|${neededSymbols().benches.join(',')}|${activePortfolio.value?.currency ?? ''}`, () => refreshMarket(false));
-    await refreshMarket(false);
+    const hostCacheOrWait = () => Promise.race([hostCache, new Promise<number>((r) => setTimeout(() => r(0), HOST_CACHE_WAIT_MS))]);
+    // open on this device's cached prices straight away; failing that, on the host's saved market data
+    let opened = await openFromCache();
+    if (!opened) opened = (await hostCacheOrWait()) > 0 && (await openFromCache());
+    if (opened) {
+      store.loading = false;
+      // then bring everything up to date in the background, starting from the host's data where that is newer
+      void (async () => {
+        if ((await hostCacheOrWait()) > 0) await openFromCache();
+        await refreshMarket(false, true);
+      })();
+    } else {
+      // nothing cached anywhere yet (the very first open): wait for the download, with a count
+      await refreshMarket(false, true);
+    }
     startTimers();
   } catch (e) {
-    store.error = String(e);
+    store.error = String(e instanceof Error ? e.message : e);
   } finally {
     store.loading = false;
   }

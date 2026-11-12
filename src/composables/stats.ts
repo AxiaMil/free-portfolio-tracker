@@ -85,7 +85,8 @@ export const keyStats = computed(() => {
     if (p.date >= from52) high52 = Math.max(high52, p.value);
   }
   const ttmFrom = addYears(r.today, -1);
-  const ttmDiv = r.dividends.filter((d) => d.status === 'received' && d.payDate > ttmFrom && d.payDate <= r.today).reduce((a, d) => a + d.amountBase, 0);
+  // net of withholding, as on the Dividends page
+  const ttmDiv = r.dividends.filter((d) => d.status === 'received' && d.payDate > ttmFrom && d.payDate <= r.today).reduce((a, d) => a + d.amountBase - d.taxBase, 0);
   const risk = allRisk.value;
   return {
     ath, high52,

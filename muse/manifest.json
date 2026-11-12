@@ -1,0 +1,59 @@
+{
+  "name": "Portfolio Tracker",
+  "about": "What a Meta Muse space for this app consists of. Copy the files as listed; nothing is designed or rewritten.",
+  "app": {
+    "source": "app/portfolio-tracker.js",
+    "copyTo": "client/src/portfolio-tracker.js",
+    "rules": [
+      "byte for byte: never edit, rebuild, minify, split, unpack, restyle, translate or port it",
+      "it is the whole front end, full screen; it mounts itself into #app and loads no other file",
+      "nothing is added to the interface: no header, title bar, avatar, navigation labels, banner, tips or notes",
+      "no sample data: a new space starts empty"
+    ]
+  },
+  "files": {
+    "muse/space.json": "space.json",
+    "muse/client/index.html": "client/index.html",
+    "muse/client/src/main.ts": "client/src/main.ts",
+    "muse/client/src/host.ts": "client/src/host.ts",
+    "muse/server/src/actions.ts": "server/src/actions.ts",
+    "muse/server/src/market.ts": "server/src/market.ts",
+    "muse/server/src/schema.ts": "server/src/schema.ts"
+  },
+  "starterParts": {
+    "client/src/api.ts": "the starter's own server-action client; client/src/host.ts imports callAction(name, input) from it",
+    "server/src/db.ts": "the starter's own Drizzle database; server/src/actions.ts imports db from it",
+    "remove": "the starter's own App component, styles and #root: the page holds only #app"
+  },
+  "storage": {
+    "tables": {
+      "app_state": { "key": "TEXT PRIMARY KEY", "value": "TEXT NOT NULL", "updated_at": "INTEGER (epoch ms)" },
+      "market_cache": { "symbol": "TEXT PRIMARY KEY (snapshot key)", "data": "TEXT NOT NULL (Yahoo JSON)", "fetched_at": "INTEGER NOT NULL (epoch ms)" }
+    },
+    "keys": {
+      "app_state/portfolio": "the whole app state as one JSON document",
+      "market_cache/chart:<SYMBOL>": "daily history, dividends, splits",
+      "market_cache/spark:<SYM,SYM,...>": "latest quotes, up to 20 symbols",
+      "market_cache/search:<SYMBOL>": "company profile"
+    }
+  },
+  "actions": {
+    "getPortfolio": { "input": {}, "returns": "{ state } (null the first time)" },
+    "savePortfolio": { "input": "{ state }", "returns": "{ ok: true }" },
+    "yahooGet": { "input": "{ url }", "returns": "parsed JSON body, also for non-200 answers", "allow": ["https://query1.finance.yahoo.com/", "https://query2.finance.yahoo.com/"], "timeoutSeconds": 20 },
+    "getSnapshot": { "input": "{ since? }", "returns": "{ entries: [{ key, data, fetchedAt }], updatedAt }" },
+    "saveSnapshotEntries": { "input": "{ entries } (at most 60)", "returns": "{ ok, saved }" },
+    "refreshMarketCache": { "input": {}, "returns": "{ ok, symbols, updated, failed, at }" }
+  },
+  "network": ["query1.finance.yahoo.com", "query2.finance.yahoo.com"],
+  "cron": [{ "id": "portfolio-tracker-market-refresh-10m", "action": "refreshMarketCache", "every": "10m" }],
+  "notNeeded": ["a database beyond the two tables", "login", "API keys or cookies", "any other network access"],
+  "checks": [
+    "Home shows 0.00 with an empty chart",
+    "the + button opens \"Manage Transaction\"",
+    "adding \"Buy AAPL, 10 shares\" shows a value within a few seconds",
+    "Settings → Data & Backup → Where it is saved says \"Muse space storage\"",
+    "reloading the space keeps the transaction",
+    "after refreshMarketCache has run once, a fresh device opens Home on the saved prices within a couple of seconds"
+  ]
+}

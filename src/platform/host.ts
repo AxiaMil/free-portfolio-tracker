@@ -1,6 +1,7 @@
 // Host bridge: the only way the app reaches storage and the network outside the browser defaults.
 // A platform that runs the app (for example a Meta Muse space) can define `window.portfolioHost` before the app
-// starts: in public/host.js (app/host.js in the prebuilt copy), or on a same-origin page that frames the app.
+// starts: in public/host.js (app/host.js in the prebuilt copy), on the page before the one-file build
+// (app/portfolio-tracker.js), or on a same-origin page that frames the app.
 // Every member is optional; anything missing falls back to the browser.
 // The full contract is in docs/HOSTING.md.
 
@@ -16,6 +17,24 @@ export interface PortfolioHost {
    * server side and resolve with the parsed JSON body. Browsers can't call Yahoo directly (no CORS headers).
    */
   fetchJson?: (url: string) => Promise<unknown>;
+  /**
+   * Market data the host keeps between visits, for example refreshed on a schedule while the app is closed:
+   * raw Yahoo responses keyed `chart:<SYMBOL>`, `spark:<SYM,SYM,...>` and `search:<SYMBOL>`. The app opens on
+   * these at once (whatever their age) and updates them live. An array, or `{ entries }`.
+   * `since` (epoch ms, 0 the first time) is about when this device last had live data: entries fetched before it
+   * may be left out, since the device has its own newer copy.
+   */
+  loadMarketCache?: (since: number) => Promise<MarketCacheEntry[] | { entries: MarketCacheEntry[] } | null | undefined>;
+  /** fresh quote (`spark:`) and profile (`search:`) responses the app fetched live, for the host to keep (best effort) */
+  saveMarketCache?: (entries: MarketCacheEntry[]) => Promise<unknown>;
+}
+
+export interface MarketCacheEntry {
+  key: string;
+  /** the Yahoo response body, as parsed JSON */
+  data: unknown;
+  /** when it was fetched, epoch ms */
+  fetchedAt: number;
 }
 
 declare global {

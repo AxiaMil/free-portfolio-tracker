@@ -3,8 +3,9 @@ import { palette, alpha } from '../theme.ts';
 // Holding details: price chart with trade flags, position stats and the holding's transactions.
 import { computed } from 'vue';
 import { useDisplay } from 'vuetify';
-import { result, marketView, openAddTransaction } from '../store.ts';
+import { result, marketView, openAddTransaction, activePortfolio, store } from '../store.ts';
 import { alloc, money, pct, price, shares, signClass, ccySymbol } from '../format.ts';
+import { eachDay } from '../engine/util.ts';
 import TimeChart from './TimeChart.vue';
 
 // axis labels stay short so large prices (property, indices) fit: 325k, 1.2M; small prices keep cents
@@ -13,10 +14,22 @@ const model = defineModel<string | null>({ default: null });
 const { mdAndUp } = useDisplay();
 const h = computed(() => result.value?.holdings.find((x) => x.symbol === model.value) ?? null);
 const txns = computed(() => (result.value?.userLedger ?? []).filter((e) => e.symbol === model.value).slice().reverse());
+const isCustom = computed(() => !!activePortfolio.value?.customAssets.some((c) => c.symbol === model.value));
 const priceSeries = computed(() => {
   if (!model.value) return [];
   const b = marketView.value.bars(model.value);
-  return b.dates.map((d, i) => [d, b.close[i]] as [string, number]);
+  const points = b.dates.map((d, i) => [d, b.close[i]] as [string, number]);
+  if (!isCustom.value || !points.length) return points;
+  // a custom asset has only the few prices you entered: hold each one until the next, and on through today
+  // (as the portfolio's value does), so every zoom has a line to show
+  const last = points[points.length - 1][0];
+  const daily: [string, number][] = [];
+  let j = 0;
+  for (const d of eachDay(points[0][0], store.today > last ? store.today : last)) {
+    while (j + 1 < points.length && points[j + 1][0] <= d) j++;
+    daily.push([d, points[j][1]]);
+  }
+  return daily;
 });
 const markers = computed(() => {
   const mv = marketView.value;
