@@ -132,7 +132,8 @@ export class MarketView {
       // overlay the live quote for today
       const q = this.quote(symbol);
       if (q?.price != null && q.time) {
-        const qd = new Date(q.time).toISOString().slice(0, 10);
+        // the exchange's own calendar date, as for the bars (UTC when an older cached quote lacks the offset)
+        const qd = new Date(q.time + (q.gmtoffset ?? 0) * 1000).toISOString().slice(0, 10);
         const p = q.price / div;
         const last = dates.length ? dates[dates.length - 1] : '';
         const qDate = qd > last ? qd : last;
@@ -167,6 +168,18 @@ export class MarketView {
     return s.close[i];
   }
 
+  /**
+   * the closing price as it was quoted on `date` (or the last trading day before it), in the trading currency's main
+   * unit: pounds, not pence, and before any later split. That is the price a trade on that day was made at, and
+   * the price the engine expects a transaction to carry. null before the history starts.
+   */
+  tradedCloseAt(symbol: string, date: string): number | null {
+    const s = this.getSeries(symbol);
+    const i = lastIndexLE(s.dates, date);
+    if (i < 0) return null;
+    return s.close[i] * (this.custom.has(symbol) ? 1 : this.splitFactorAfter(symbol, date));
+  }
+
   /** previous trading day close strictly before date */
   prevCloseBefore(symbol: string, date: string): number | null {
     const s = this.getSeries(symbol);
@@ -193,7 +206,16 @@ export class MarketView {
     return s.close.length ? s.close[s.close.length - 1] : null;
   }
 
-  /** FX multiplier converting 1 unit of `ccy` into base currency on date */
+  /** whether a rate from `ccy` to the base currency is known (fxAt falls back to 1 when it isn't) */
+  hasFx(ccy: string): boolean {
+    const c = normalizeCurrency(ccy).code;
+    if (c === this.base) return true;
+    const known = (sym: string) => !!(this.chart(sym)?.bars?.length || this.quote(sym)?.price);
+    if (known(fxSymbol(c, this.base))) return true;
+    return c !== 'USD' && this.base !== 'USD' && known(fxSymbol(c, 'USD')) && known(fxSymbol('USD', this.base));
+  }
+
+  /** FX multiplier converting 1 unit of `ccy` into base currency on date (1 when no rate is known: see hasFx) */
   fxAt(ccy: string, date: string): number {
     const c = normalizeCurrency(ccy).code;
     if (c === this.base) return 1;

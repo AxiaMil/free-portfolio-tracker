@@ -214,6 +214,8 @@ Date,Action,Ticker,Shares,Price,Currency
 ```
 
 - Column names don't have to match exactly: `Symbol`, `Qty` or `Trade Date` work too. You may need to tidy your broker's file so it has these columns.
+- Dates and numbers can be written your country's way, such as `15/03/2024` or `1.234,50`.
+- Before anything is added, you see every row. A row the app can't read is listed with the reason, and a missing price is filled in with that day's closing price for you to check.
 - Tickers are the ones Yahoo Finance uses: `AAPL` in the US, `BN4.SI` in Singapore, `0700.HK` in Hong Kong, `VUSA.L` in London.
 - `Market` means the currency the share trades in.
 
@@ -285,7 +287,7 @@ Search uses Yahoo Finance's ticker symbols, which add a suffix for many exchange
 
 ### Why are my dividends lower than what my shares pay?
 
-If you've set a dividend tax rate (*Settings → Portfolio Settings*), the Dividends page shows what you get after tax. The top line shows the amount before tax, the tax, and what's left.
+If you've set a dividend tax rate (*Settings → Portfolio Settings*), the Dividends page and each holding show what you get after tax. The Dividends page's top line shows the amount before tax, the tax, and what's left. On Home, the P&L breakdown shows dividends before tax, with the tax under *Taxes*.
 
 ### Is this financial advice?
 

@@ -4,7 +4,7 @@ import { getCharts } from '../market/client.ts';
 import { computed, reactive, ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 import { useRouter } from 'vue-router';
-import { store, activePortfolio, addTransactions, fetchSearch, newPortfolio, toast, market } from '../store.ts';
+import { store, activePortfolio, addTransactions, fetchSearch, newPortfolio, toast, market, marketView } from '../store.ts';
 import { ASSET_ACTIONS, CASH_ACTIONS, POPULAR_ACTIONS, type Action, type Txn } from '../engine/types.ts';
 import { todayLocal, uid } from '../engine/util.ts';
 import { parseTransactionsCsv } from '../csv.ts';
@@ -12,7 +12,8 @@ import { parseTransactionsCsv } from '../csv.ts';
 const { mdAndUp } = useDisplay();
 const router = useRouter();
 const step = ref<1 | 2>(1);
-interface Row { key: string; date: string; action: Action; symbol: string; shares: string; price: string; currency: string; commission: string; note: string; open: boolean }
+// autoPrice: the price the form filled in itself, so it can follow later changes of date or ticker until you type your own
+interface Row { key: string; date: string; action: Action; symbol: string; shares: string; price: string; currency: string; commission: string; note: string; open: boolean; autoPrice?: string }
 const rows = ref<Row[]>([]);
 const page = ref(1);
 const perPage = ref(10);
@@ -29,7 +30,7 @@ const fromLocalDate = (d: unknown) => { const x = d instanceof Date ? d : new Da
 function pickDate(r: { date: string; key: string }, v: unknown) { r.date = fromLocalDate(v); dateMenu[r.key] = false; autofillPrice(r as any); }
 const blankRow = (p: Partial<Txn> = {}): Row => ({
   key: uid('r'), date: p.date ?? todayLocal(), action: (p.action as Action) ?? 'Buy', symbol: p.symbol && p.symbol !== 'CASH' ? p.symbol : '',
-  shares: p.shares != null ? String(p.shares) : '', price: p.price != null ? String(p.price) : '', currency: p.currency ?? (p.action && isCash(p.action as Action) ? activePortfolio.value?.currency ?? 'USD' : 'Market'),
+  shares: p.shares != null ? String(p.shares) : '', price: p.price != null && isFinite(p.price) ? String(p.price) : '', currency: p.currency ?? (p.action && isCash(p.action as Action) ? activePortfolio.value?.currency ?? 'USD' : 'Market'),
   commission: p.commission != null ? String(p.commission) : '0', note: p.note ?? '', open: false,
 });
 
@@ -39,6 +40,7 @@ watch(() => store.addDialog.open, (open) => {
   rows.value = [blankRow(pre ?? {})];
   page.value = 1;
   step.value = pre ? 2 : 1;
+  autofillPrice(rows.value[0]); // "Add Transaction" on a holding: start with the day's price
 });
 
 const paged = computed(() => rows.value.slice((page.value - 1) * perPage.value, page.value * perPage.value));
@@ -64,24 +66,32 @@ function onSearch(r: Row, q: string | null) {
   }, 220);
 }
 
+// actions whose price is a share price (a dividend's price is the amount per share, a stock dividend's is unused)
+const PRICED = new Set<Action>(['Buy', 'Sell', 'Transfer in', 'Transfer out']);
 async function autofillPrice(r: Row) {
-  if (!r.symbol || r.price || isCash(r.action)) return;
+  if (!r.symbol || !PRICED.has(r.action)) return;
+  if (r.price && r.price !== r.autoPrice) return; // typed by you: never overwritten
+  const date = r.date;
   try {
-    let chart = market.value.charts[r.symbol];
-    if (!chart) {
-      chart = (await getCharts([r.symbol]))[r.symbol];
-      if (chart?.bars?.length) market.value = { ...market.value, charts: { ...market.value.charts, [r.symbol]: chart } };
+    const sym = r.symbol.trim().toUpperCase();
+    if (!marketView.value.custom.has(sym) && !market.value.charts[sym]) {
+      const chart = (await getCharts([sym]))[sym];
+      if (chart?.bars?.length) market.value = { ...market.value, charts: { ...market.value.charts, [sym]: chart } };
     }
-    const bars = chart?.bars ?? [];
-    let px: number | null = null;
-    for (const b of bars) if (b[0] <= r.date) px = b[4];
-    if (px != null && !r.price) r.price = String(+px.toFixed(4));
-  } catch { /* offline: leave empty */ }
+    // the price as traded that day: the chart's history is split-adjusted, and London prices come in pence
+    if (r.date !== date || (r.price && r.price !== r.autoPrice)) return; // changed again meanwhile
+    const px = marketView.value.tradedCloseAt(sym, date);
+    r.price = px != null ? String(+px.toFixed(4)) : '';
+    r.autoPrice = r.price;
+  } catch { /* offline: leave it as it is */ }
 }
 
 function setAction(r: Row, a: Action) {
   r.action = a;
+  // a share price filled in for a buy is not a dividend's amount per share
+  if (!PRICED.has(a) && r.price && r.price === r.autoPrice) { r.price = ''; r.autoPrice = undefined; }
   if (isCash(a)) { r.symbol = ''; r.price = r.price || '1'; if (r.currency === 'Market') r.currency = activePortfolio.value?.currency ?? 'USD'; }
+  else autofillPrice(r);
 }
 
 function validate(r: Row): string | null {
@@ -110,9 +120,10 @@ async function onFile(ev: Event) {
   const { txns, errors } = parseTransactionsCsv(text);
   if (!txns.length) { toast(errors[0] ?? 'No transactions found in file', 'error'); return; }
   const imported = txns.map((t) => blankRow(t));
+  for (const r of imported) if (!r.price) autofillPrice(r); // a file without a price: the day's price, to review
   rows.value = rows.value.length === 1 && !rows.value[0].symbol && !rows.value[0].shares ? imported : [...rows.value, ...imported];
   step.value = 2;
-  toast(`${txns.length} rows loaded from ${f.name}${errors.length ? ` (${errors.length} skipped)` : ''}`);
+  toast(`${txns.length} rows loaded from ${f.name}${errors.length ? ` (${errors.length} skipped: ${errors.slice(0, 3).join('; ')}${errors.length > 3 ? '; …' : ''})` : ''}`);
   (ev.target as HTMLInputElement).value = '';
 }
 
@@ -214,7 +225,7 @@ function choose(id: string) {
               <span class="div" />
               <v-text-field v-model="r.shares" :label="isCash(r.action) ? 'Amount' : 'Shares'" type="number" density="compact" variant="outlined" hide-details class="f-shares" />
               <span class="div" />
-              <v-text-field v-model="r.price" label="Price" type="number" density="compact" variant="outlined" hide-details class="f-price" />
+              <v-text-field v-model="r.price" :label="r.action === 'Dividend' ? 'Per share' : 'Price'" type="number" density="compact" variant="outlined" hide-details class="f-price" />
               <span class="div" />
               <v-select v-model="r.currency" :items="CURRENCIES" label="Currency" density="compact" variant="outlined" hide-details class="f-ccy" />
               <span class="div" />

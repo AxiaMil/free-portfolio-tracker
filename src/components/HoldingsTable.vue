@@ -115,7 +115,7 @@ function doRemove() {
 
 const SORT_OPTIONS = [
   { title: 'Allocation', value: 'allocation' }, { title: 'Ticker', value: 'symbol' }, { title: 'Daily Gain', value: 'dayGain' },
-  { title: 'All Gain', value: 'unrealized' }, { title: 'Total Value', value: 'marketValue' }, { title: 'Daily Gain %', value: 'dayGainPct' }, { title: 'All Gain %', value: 'unrealizedPct' },
+  { title: 'Unrealized Gain', value: 'unrealized' }, { title: 'Total Value', value: 'marketValue' }, { title: 'Daily Gain %', value: 'dayGainPct' }, { title: 'Unrealized Gain %', value: 'unrealizedPct' },
 ];
 </script>
 
@@ -163,7 +163,7 @@ const SORT_OPTIONS = [
               </td>
             </tr>
             <tr v-for="h in paged" :key="h.symbol">
-              <td class="tick"><button class="tick-btn" @click="detail = h.symbol"><b>{{ h.symbol }}</b><span class="name">{{ h.name }}</span></button></td>
+              <td class="tick"><button class="tick-btn" @click="detail = h.symbol"><b>{{ h.symbol }}</b><span class="name" :title="h.name">{{ h.name }}</span></button></td>
               <td v-for="c in COLS[view]" :key="c.key" :class="c.cls ? c.cls(h) : ''">
                 <template v-if="c.key === 'range52'">
                   <div class="range52"><span>{{ price(h.low52) }}</span><div class="bar"><div class="dot" :style="{ left: rangePos(h) + '%' }" /></div><span>{{ price(h.high52) }}</span></div>
@@ -217,14 +217,14 @@ const SORT_OPTIONS = [
       <div v-for="h in mobileRows" :key="h.symbol" class="hcard" @click="detail = h.symbol">
         <div class="hc-left">
           <div class="hc-sym">{{ h.symbol }}</div>
-          <div class="hc-name">{{ h.name }}</div>
+          <div class="hc-name" :title="h.name">{{ h.name }}</div>
           <div class="hc-last">{{ price(h.last) }}</div>
           <div :class="signClass(h.dayGainPct)">{{ pct(h.dayGainPct) }}</div>
           <template v-if="mobileMode === 'Expand'"><div class="hc-lbl mt-3">Allocation</div><div>{{ alloc(h.allocation) }}</div></template>
         </div>
         <div class="hc-grid">
           <span class="hc-lbl">Daily Gain</span><span :class="signClass(h.dayGain)">{{ money(h.dayGain, { sign: true }) }} ({{ pct(h.dayGainPct, { sign: false }) }})</span>
-          <span class="hc-lbl">All Gain</span><span :class="signClass(h.unrealized)">{{ money(h.unrealized, { sign: true }) }} ({{ pct(h.unrealizedPct, { sign: false }) }})</span>
+          <span class="hc-lbl">Unr. Gain</span><span :class="signClass(h.unrealized)">{{ money(h.unrealized, { sign: true }) }} ({{ pct(h.unrealizedPct, { sign: false }) }})</span>
           <template v-if="mobileMode === 'Expand'">
             <span class="hc-lbl">Avg. Cost</span><span>{{ price(h.avgCost) }}</span>
             <span class="hc-lbl">Shares</span><span>{{ shares(h.shares) }}</span>
@@ -264,7 +264,8 @@ const SORT_OPTIONS = [
 .p-table th.sortable { cursor: pointer; user-select: none; }
 .tick { min-width: 140px; }
 .tick-btn { background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; display: flex; flex-direction: column; font-size: 14px; line-height: 19px; }
-.tick-btn .name { font-size: 11.5px; line-height: 15px; color: var(--muted); font-weight: 400; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+// long names take two lines (three on phone cards) before they're cut; the full name is in the title and the holding's details
+.tick-btn .name { font-size: 11.5px; line-height: 15px; color: var(--muted); font-weight: 400; max-width: 190px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .cash-row td { font-size: 14px; }
 .menu-cell { width: 36px; text-align: right; }
 .row-menu { background: none; border: 0; color: var(--text); cursor: pointer; display: inline-flex; }
@@ -283,7 +284,7 @@ const SORT_OPTIONS = [
 .hcard.cash { justify-content: space-between; align-items: center; }
 .hc-left { width: 92px; flex: none; min-width: 0; }
 .hc-sym { font-weight: 700; font-size: 16px; line-height: 22px; }
-.hc-name { color: var(--muted); font-size: 11px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hc-name { color: var(--muted); font-size: 11px; line-height: 15px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
 .hc-last { font-size: 17px; line-height: 22px; margin-top: 4px; }
 .hc-lbl { color: var(--text-2); font-size: 12px; }
 .hc-left .hc-lbl { font-size: 10.5px; margin-top: 10px !important; }

@@ -106,7 +106,7 @@ function csv(): Array<Array<string | number>> {
               <span class="dot" :style="{ background: r.color }" />
               <span class="an">
                 <b>{{ r.kind === 'cash' ? r.name : r.symbol }}</b>
-                <span v-if="r.kind !== 'cash'" class="nm">{{ r.name }}</span>
+                <span v-if="r.kind !== 'cash'" class="nm" :title="r.name">{{ r.name }}</span>
               </span>
             </td>
             <td class="r">{{ money(r.current) }}</td>
@@ -139,7 +139,7 @@ function csv(): Array<Array<string | number>> {
           <span class="dot" :style="{ background: r.color }" />
           <div class="m-id">
             <b>{{ r.kind === 'cash' ? r.name : r.symbol }}</b>
-            <span v-if="r.kind !== 'cash'" class="nm">{{ r.name }}</span>
+            <span v-if="r.kind !== 'cash'" class="nm" :title="r.name">{{ r.name }}</span>
           </div>
           <div class="m-delta">
             <div :class="signClass(Math.abs(r.delta) < 0.005 ? 0 : r.delta)">{{ Math.abs(r.delta) < 0.005 ? money(0) : money(r.delta, { sign: true }) }}</div>
@@ -176,7 +176,7 @@ function csv(): Array<Array<string | number>> {
 .p-table td { height: 52px; }
 .asset { display: flex; align-items: center; gap: 10px; min-width: 220px; }
 .an { display: flex; flex-direction: column; line-height: 18px; min-width: 0; }
-.nm { font-size: 11.5px; line-height: 15px; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm { font-size: 11.5px; line-height: 15px; color: var(--muted); max-width: 220px; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .units { font-size: 11.5px; line-height: 15px; color: var(--muted); }
 tfoot td { border-top: 1px solid var(--border); height: 48px; }

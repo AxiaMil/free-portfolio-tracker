@@ -99,7 +99,9 @@ const TURN_HELP = 'The lesser of purchases and sales in the period divided by th
       <span class="li"><i :style="{ background: palette.neg }" />Sell</span>
     </div>
 
-    <div v-if="data" class="card act-table">
+    <!-- on a phone the wide table scrolls sideways, so its export button sits above it, always in reach -->
+    <div v-if="data && !mdAndUp" class="exp-bar"><ShareButton icon :csv="csv" filename="trade-activity" label="Export table" /></div>
+    <div v-if="data" class="card act-table" :class="{ m: !mdAndUp }">
       <div class="table-wrap">
         <table class="p-table">
           <thead>
@@ -114,7 +116,7 @@ const TURN_HELP = 'The lesser of purchases and sales in the period divided by th
               <th>Sell Value</th>
               <th>Trade Value</th>
               <th>Portfolio Turnover <HelpTip :size="13" icon="mdi-information" :text="TURN_HELP" /></th>
-              <th class="exp-col"><ShareButton icon :csv="csv" filename="trade-activity" label="Export table" class="exp" /></th>
+              <th v-if="mdAndUp" class="exp-col"><ShareButton icon :csv="csv" filename="trade-activity" label="Export table" class="exp" /></th>
             </tr>
           </thead>
           <tbody>
@@ -129,7 +131,7 @@ const TURN_HELP = 'The lesser of purchases and sales in the period divided by th
               <td>{{ money(r.sellValue) }}</td>
               <td>{{ money(r.tradeValue) }}</td>
               <td>{{ pctOrDash(r.turnover) }}</td>
-              <td />
+              <td v-if="mdAndUp" />
             </tr>
             <tr class="total">
               <td>{{ data.total.label }}</td>
@@ -142,7 +144,7 @@ const TURN_HELP = 'The lesser of purchases and sales in the period divided by th
               <td>{{ money(data.total.sellValue) }}</td>
               <td>{{ money(data.total.tradeValue) }}</td>
               <td>{{ pctOrDash(data.total.turnover) }}</td>
-              <td />
+              <td v-if="mdAndUp" />
             </tr>
           </tbody>
         </table>
@@ -164,6 +166,8 @@ const TURN_HELP = 'The lesser of purchases and sales in the period divided by th
 .p-table tr.total td { font-weight: 600; border-top: 1px solid var(--border); background: var(--hover); }
 .exp-col { width: 44px; text-align: right; padding-right: 10px !important; }
 .exp { width: 32px; height: 32px; border: 0; color: var(--text-2); }
+.exp-bar { display: flex; justify-content: flex-end; margin-top: 22px; :deep(.outline-btn.icon) { height: 28px; width: 40px; border-radius: 8px; border-color: var(--border-strong); } }
+.act-table.m { margin-top: 8px; }
 @media (max-width: 959px) {
   .act { margin-top: 64px; }
   .act-title { font-size: 14px; gap: 14px; }

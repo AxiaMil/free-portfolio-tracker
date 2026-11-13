@@ -89,7 +89,7 @@ function onEnter() {
         <v-progress-linear v-if="loading" indeterminate color="primary" height="2" />
         <button v-for="h in hits" :key="h.symbol + h.exchange" class="hit" @click="pick(h.symbol)">
           <span class="sym">{{ h.symbol }}</span>
-          <span class="nm">{{ h.name }}</span>
+          <span class="nm" :title="h.name">{{ h.name }}</span>
           <span class="ex">{{ [h.exchange, h.type].filter(Boolean).join(' · ') }}</span>
         </button>
         <div v-if="!loading && q.trim() && !hits.length" class="none">
@@ -117,7 +117,7 @@ function onEnter() {
   text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border); padding: 9px 6px; color: var(--text); cursor: pointer;
   &:hover { background: var(--hover); }
   .sym { font-weight: 700; font-size: 14px; grid-row: span 2; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .nm { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nm { font-size: 14px; line-height: 19px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
   .ex { font-size: 11.5px; color: var(--muted); }
 }
 .none { color: var(--text-2); font-size: 13px; padding: 16px 6px; }

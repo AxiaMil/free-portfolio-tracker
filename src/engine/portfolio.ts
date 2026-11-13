@@ -21,7 +21,8 @@ export interface EngineResult {
   inception: string | null;
   userLedger: LedgerEntry[];
   ledger: LedgerEntry[]; // adjusted, chronological
-  warnings: Array<{ id: string; date: string; symbol: string; message: string; low: number; high: number }>;
+  /** price: the trade price is outside the day's low-high range; oversold: more shares sold than held (low = high = shares held then, as entered) */
+  warnings: Array<{ id: string; date: string; symbol: string; message: string; low: number; high: number; kind: 'price' | 'oversold' }>;
   series: DayPoint[];
   dateIndex: Map<string, number>;
   holdings: Holding[]; // open positions, sorted by market value desc
@@ -37,7 +38,10 @@ export interface EngineResult {
   benchmarks: string[];
   realizedBySymbol: Record<string, number>;
   feesBySymbol: Record<string, number>;
+  /** dividends received per holding, after withholding tax (what reached your cash) */
   dividendsBySymbol: Record<string, number>;
+  /** currencies the portfolio uses that have no exchange rate to the base currency yet: their values are not converted */
+  missingFx: string[];
 }
 
 const isCashSymbol = (s: string) => !s || s.toUpperCase() === 'CASH';
@@ -78,14 +82,14 @@ function payLag(m: MarketView, symbol: string): number {
   return 0;
 }
 
-/** shares held (split-adjusted) strictly before `date` */
-function sharesBefore(entries: LedgerEntry[], symbol: string, date: string, m: MarketView): number {
+/** shares held (split-adjusted) strictly before `date`; entries in date order. Without margin, never below zero. */
+function sharesBefore(entries: LedgerEntry[], symbol: string, date: string, m: MarketView, margin: boolean): number {
   let s = 0;
   for (const e of entries) {
     if (e.symbol !== symbol || e.date >= date) continue;
     const f = m.splitFactorAfter(symbol, e.date);
     if (e.action === 'Buy' || e.action === 'Transfer in' || e.action === 'Stock dividend') s += e.shares * f;
-    else if (e.action === 'Sell' || e.action === 'Transfer out') s -= e.shares * f;
+    else if (e.action === 'Sell' || e.action === 'Transfer out') s = margin ? s - e.shares * f : Math.max(0, s - e.shares * f);
   }
   return s;
 }
@@ -105,10 +109,12 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
     const r = m.dayRange(e.symbol, e.date);
     if (!r) continue;
     const f = m.splitFactorAfter(e.symbol, e.date);
-    const px = e.price / f;
+    // compared in the instrument's own currency, whatever currency the trade was entered in
+    const c = m.currencyOf(e.symbol);
+    const px = (e.currency === c ? e.price : (e.price * e.fx) / m.fxAt(c, e.date)) / f;
     const tol = 0.005;
     if (px < r.low * (1 - tol) || px > r.high * (1 + tol)) {
-      warnings.push({ id: e.id, date: e.date, symbol: e.symbol, low: r.low * f, high: r.high * f, message: `The transaction is added, but your trading price is not in low and high range (${+(r.low * f).toFixed(2)} - ${+(r.high * f).toFixed(2)}) of the given date.` });
+      warnings.push({ id: e.id, date: e.date, symbol: e.symbol, low: r.low * f, high: r.high * f, kind: 'price', message: `The transaction is added, but your trading price is not in low and high range (${+(r.low * f).toFixed(4)} - ${+(r.high * f).toFixed(4)}${e.currency === c ? '' : ` ${c}`}) of the given date.` });
     }
   }
 
@@ -125,17 +131,18 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       const manual = user.filter((e) => e.symbol === sym && e.action === 'Dividend');
       for (const [exDate, perShare] of m.dividends(sym)) {
         if (exDate <= firstDate) continue;
-        const shares = sharesBefore(user, sym, exDate, m);
+        const shares = sharesBefore(user, sym, exDate, m, p.margin);
         if (shares <= 1e-9) continue;
         const payDate = addDays(exDate, lag);
         if (manual.some((x) => x.date >= addDays(exDate, -5) && x.date <= addDays(payDate, 20))) continue;
         const received = payDate <= today;
         const fx = m.fxAt(ccy, received ? payDate : today);
         const amountLocal = perShare * shares;
-        dividendEvents.push({ symbol: sym, exDate, payDate, perShare, shares, currency: ccy, amountBase: amountLocal * fx, taxBase: amountLocal * fx * taxRate, status: received ? 'received' : 'confirmed' });
+        const taxBase = amountLocal * fx * taxRate;
+        dividendEvents.push({ symbol: sym, exDate, payDate, perShare, shares, currency: ccy, amountBase: amountLocal * fx, taxBase, status: received ? 'received' : 'confirmed' });
         const entry: LedgerEntry = {
           id: `auto-div-${sym}-${exDate}`, date: payDate, action: 'Dividend', symbol: sym, price: perShare, currency: ccy, shares,
-          commission: 0, commissionBase: 0, amountBase: amountLocal * fx, fx, auto: 'dividend', status: received ? 'confirmed' : 'upcoming',
+          commission: 0, commissionBase: 0, amountBase: amountLocal * fx, fx, auto: 'dividend', taxBase, status: received ? 'confirmed' : 'upcoming',
         };
         autoEntries.push(entry);
         if (taxRate > 0) {
@@ -187,39 +194,44 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
   const upcomingEntries = autoEntries.filter((e) => e.status === 'upcoming');
 
   // ---------- lots, realised gains, fees ----------
+  // a lot's price per share in the instrument's own currency, split-adjusted (a trade can be entered in another currency)
+  const localPrice = (e: LedgerEntry, f: number) => {
+    const c = m.currencyOf(e.symbol);
+    return (e.currency === c ? e.price : (e.price * e.fx) / m.fxAt(c, e.date)) / f;
+  };
   const lots: Lot[] = [];
   const realizedBySymbol: Record<string, number> = {};
   const feesBySymbol: Record<string, number> = {};
   const dividendsBySymbol: Record<string, number> = {};
   let lotSeq = 0;
+  const realize = (sym: string, r: number) => { realizedBySymbol[sym] = (realizedBySymbol[sym] || 0) + r; };
   for (const e of ledger) {
     if (e.symbol === 'CASH') continue;
     const f = m.splitFactorAfter(e.symbol, e.date);
     const sh = e.shares * f;
-    if (e.action === 'Dividend') { dividendsBySymbol[e.symbol] = (dividendsBySymbol[e.symbol] || 0) + e.amountBase; continue; }
     feesBySymbol[e.symbol] = (feesBySymbol[e.symbol] || 0) + e.commissionBase;
+    // after the automatic withholding tax, which the ledger also books as its own Taxes entry
+    if (e.action === 'Dividend') { dividendsBySymbol[e.symbol] = (dividendsBySymbol[e.symbol] || 0) + e.amountBase - (e.taxBase ?? 0); continue; }
     if (e.action === 'Buy' || e.action === 'Transfer in' || e.action === 'Stock dividend') {
       const costBase = e.action === 'Stock dividend' ? 0 : e.amountBase;
-      lots.push({ id: `lot${++lotSeq}`, symbol: e.symbol, side: 'long', openDate: e.date, price: e.price / f, currency: e.currency, shares: sh, openShares: sh, costBase, closedShares: 0, realized: 0, closeDate: null, sourceId: e.id });
-      if (opts.costMethod === 'Average') {
-        // pool all open lots of the symbol at their average cost (keeps lot list for trade analysis dates)
-      }
+      lots.push({ id: `lot${++lotSeq}`, symbol: e.symbol, side: 'long', openDate: e.date, price: localPrice(e, f), currency: m.currencyOf(e.symbol), shares: sh, openShares: sh, costBase, closedShares: 0, realized: 0, closeDate: null, sourceId: e.id });
     } else if (e.action === 'Sell' || e.action === 'Transfer out') {
       let remaining = sh;
       const open = lots.filter((l) => l.symbol === e.symbol && l.openShares > 1e-12);
       const proceedsPerShare = e.amountBase / (sh || 1);
       if (opts.costMethod === 'Average') {
-        const totShares = open.reduce((s, l) => s + l.openShares, 0) || 1;
+        const totShares = open.reduce((s, l) => s + l.openShares, 0);
         const totCost = open.reduce((s, l) => s + (l.costBase * l.openShares) / l.shares, 0);
-        const avg = totCost / totShares;
+        const avg = totShares > 0 ? totCost / totShares : 0;
+        const sold = Math.min(remaining, totShares);
         for (const l of open) {
-          const take = Math.min(l.openShares, (remaining * l.openShares) / totShares);
+          const take = Math.min(l.openShares, (sold * l.openShares) / totShares);
           const r = take * (proceedsPerShare - avg);
           l.openShares -= take; l.closedShares += take; l.realized += r;
           if (l.openShares <= 1e-9) l.closeDate = e.date;
-          realizedBySymbol[e.symbol] = (realizedBySymbol[e.symbol] || 0) + (e.action === 'Sell' ? r : 0);
+          realize(e.symbol, r);
         }
-        remaining = 0;
+        remaining -= sold;
       } else {
         for (const l of open) {
           if (remaining <= 1e-12) break;
@@ -229,11 +241,17 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
           l.openShares -= take; l.closedShares += take; l.realized += r;
           if (l.openShares <= 1e-9) l.closeDate = e.date;
           remaining -= take;
-          realizedBySymbol[e.symbol] = (realizedBySymbol[e.symbol] || 0) + (e.action === 'Sell' ? r : 0);
+          realize(e.symbol, r);
         }
       }
       if (remaining > 1e-9 && p.margin) {
-        lots.push({ id: `lot${++lotSeq}`, symbol: e.symbol, side: 'short', openDate: e.date, price: e.price / f, currency: e.currency, shares: -remaining, openShares: -remaining, costBase: -remaining * proceedsPerShare, closedShares: 0, realized: 0, closeDate: null, sourceId: e.id });
+        lots.push({ id: `lot${++lotSeq}`, symbol: e.symbol, side: 'short', openDate: e.date, price: localPrice(e, f), currency: m.currencyOf(e.symbol), shares: -remaining, openShares: -remaining, costBase: -remaining * proceedsPerShare, closedShares: 0, realized: 0, closeDate: null, sourceId: e.id });
+      } else if (remaining > 1e-9) {
+        // more shares sold than held, without margin: the extra shares had no recorded cost, so all they brought in is
+        // gain. The position ends at zero (the daily values do the same) and the sale is listed under warnings.
+        realize(e.symbol, remaining * proceedsPerShare);
+        const held = (sh - remaining) / f; // in the terms the trade was entered in, before later splits
+        warnings.push({ id: e.id, date: e.date, symbol: e.symbol, low: held, high: held, kind: 'oversold', message: `This ${e.action === 'Sell' ? 'sale' : 'transfer'} is of ${+e.shares.toFixed(6)} shares, but you held ${+held.toFixed(6)} then. Add the missing buy or transfer in, or correct the number of shares.` });
       }
     }
   }
@@ -267,7 +285,10 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
         cash += cashDelta(e);
         const f = e.symbol !== 'CASH' ? m.splitFactorAfter(e.symbol, e.date) : 1;
         if (e.action === 'Buy' || e.action === 'Transfer in' || e.action === 'Stock dividend') shares[e.symbol] = (shares[e.symbol] || 0) + e.shares * f;
-        if (e.action === 'Sell' || e.action === 'Transfer out') shares[e.symbol] = (shares[e.symbol] || 0) - e.shares * f;
+        if (e.action === 'Sell' || e.action === 'Transfer out') {
+          const left = (shares[e.symbol] || 0) - e.shares * f;
+          shares[e.symbol] = p.margin ? left : Math.max(0, left); // without margin a position can't go below zero
+        }
         if (e.action === 'Deposit') { flow += e.amountBase; gross += e.amountBase; }
         if (e.action === 'Withdraw') flow -= e.amountBase;
         if (e.action === 'Transfer in') { flow += e.amountBase; gross += e.amountBase; }
@@ -275,10 +296,12 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       }
       nd += flow;
       let hv = 0;
+      const isToday = d === today;
       for (const s of assetSymbols) {
         const q = shares[s];
         if (!q) continue;
-        const px = m.priceAt(s, d);
+        // today: the latest price, as the holdings use (an exchange ahead of your time zone may already trade tomorrow)
+        const px = isToday ? m.lastPrice(s) : m.priceAt(s, d);
         if (px == null) continue;
         hv += q * px * m.fxAt(ccyOf[s], d);
       }
@@ -290,7 +313,7 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       const benchIndex: Record<string, number> = {};
       const benchLocal: Record<string, number> = {};
       for (const b of benchmarks) {
-        const px = m.priceAt(b, d);
+        const px = isToday ? m.lastPrice(b) : m.priceAt(b, d);
         const fx = m.fxAt(benchCcy[b], d);
         const bp = px != null ? px * fx : null;
         if (bp) {
@@ -349,7 +372,8 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       if (e.symbol !== sym) continue;
       if (e.action === 'Buy' || e.action === 'Transfer in') flows.push([e.date, -(e.amountBase + e.commissionBase)]);
       else if (e.action === 'Sell' || e.action === 'Transfer out') flows.push([e.date, e.amountBase - e.commissionBase]);
-      else if (e.action === 'Dividend') flows.push([e.date, e.amountBase]);
+      else if (e.action === 'Dividend') flows.push([e.date, e.amountBase - (e.taxBase ?? 0) - e.commissionBase]);
+      else if (e.commissionBase) flows.push([e.date, -e.commissionBase]); // a stock dividend's commission
     }
     flows.push([today, mv]);
     const first = flows[0][0];
@@ -428,10 +452,14 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
   }
   const dividends = [...dividendEvents.filter((d) => d.status === 'received'), ...upcoming].sort((a, b) => a.payDate.localeCompare(b.payDate));
 
+  // currencies in use without a rate to the base currency (their amounts count 1:1 until one loads)
+  const used = new Set<string>([...user.map((e) => e.currency), ...assetSymbols.map((s) => m.currencyOf(s)), ...benchmarks.map((b) => m.currencyOf(b))]);
+  const missingFx = [...used].filter((c) => c && !m.hasFx(c)).sort();
+
   return {
     base, today, inception, userLedger: user, ledger: [...ledger, ...upcomingEntries].sort((a, b) => a.date.localeCompare(b.date)),
     warnings, series, dateIndex, holdings, cashRow, closed, lots, dividends, value, cash, netDeposits: last ? last.netDeposits : 0, pnl,
-    symbols: assetSymbols, benchmarks, realizedBySymbol, feesBySymbol, dividendsBySymbol,
+    symbols: assetSymbols, benchmarks, realizedBySymbol, feesBySymbol, dividendsBySymbol, missingFx,
   };
 }
 

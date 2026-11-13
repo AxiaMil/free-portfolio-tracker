@@ -180,7 +180,7 @@ const daysOld = (a: CustomAsset) => {
           <button class="ac-top" @click="select(a.symbol)">
             <div class="ac-left">
               <div class="ac-sym">{{ a.symbol }}</div>
-              <div class="ac-name">{{ a.name }}</div>
+              <div class="ac-name" :title="a.name">{{ a.name }}</div>
             </div>
             <div class="ac-right">
               <div class="ac-val">{{ holding(a.symbol) ? money(holding(a.symbol)!.marketValue) : '-' }}</div>
@@ -329,7 +329,7 @@ const daysOld = (a: CustomAsset) => {
 .ac-top { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 10px 12px 14px; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; }
 .ac-left { flex: 1; min-width: 0; }
 .ac-sym { font-weight: 700; font-size: 16px; line-height: 22px; }
-.ac-name { color: var(--muted); font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-name { color: var(--muted); font-size: 12px; line-height: 16px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .ac-right { text-align: right; }
 .ac-val { font-size: 15px; font-weight: 500; }
 .ac-px { font-size: 11.5px; color: var(--text-2); }

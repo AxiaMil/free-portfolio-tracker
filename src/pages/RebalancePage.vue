@@ -84,7 +84,7 @@ const targetProps = computed(() =>
       <div v-for="r in pageRows" :key="r.key" class="rcard" :class="{ extra: r.kind === 'extra' }">
         <div class="c-name">
           <b>{{ r.symbol }}</b>
-          <span class="nm">{{ r.kind === 'extra' && r.name === r.symbol ? 'New target' : r.name }}</span>
+          <span class="nm" :title="r.name">{{ r.kind === 'extra' && r.name === r.symbol ? 'New target' : r.name }}</span>
         </div>
         <div class="c-val"><div class="lbl">Current Value</div><div class="val">{{ amount(r.current) }}</div></div>
         <div class="c-alloc"><div class="lbl">Current Allocation</div><div class="val">{{ pct2(r.currentPct) }}</div></div>
@@ -155,7 +155,7 @@ const targetProps = computed(() =>
 .rcard.cash { min-height: 53px; margin-top: 19px; }
 .list { margin-top: 25px; }
 .c-name { display: flex; flex-direction: column; min-width: 0; line-height: 21px; b { font-size: 16px; font-weight: 700; } }
-.nm { font-size: 12px; line-height: 18px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.nm { font-size: 12px; line-height: 16px; color: var(--text); max-width: 168px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .lbl { font-size: 12px; line-height: 16px; color: var(--text); }
 .val { font-size: 16px; line-height: 22px; color: var(--text); white-space: nowrap; }
 .cur-field { width: 145px; margin-left: -8px; }

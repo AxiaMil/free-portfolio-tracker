@@ -5,7 +5,7 @@ import { useDisplay } from 'vuetify';
 import { result, store, benchName } from '../store.ts';
 import { primaryBench } from '../composables/stats.ts';
 import { addDays, xirr } from '../engine/util.ts';
-import { money, moneyAxis, pct } from '../format.ts';
+import { money, moneyAxis, pct, pctAxis } from '../format.ts';
 import PortfolioHeader from '../components/PortfolioHeader.vue';
 import PillToggle from '../components/PillToggle.vue';
 import HelpTip from '../components/HelpTip.vue';
@@ -120,7 +120,7 @@ const METHOD_HELP = 'MWR (money-weighted, XIRR) counts the size and timing of yo
       </div>
     </div>
 
-    <TimeChart ref="tc" class="main-chart" :series="series" :height="mdAndUp ? 439 : 262" :legend-below="!mdAndUp" :show-y-axis="mode !== 'Value'" :y-formatter="isPct ? (v: number) => `${(v * 100).toFixed(0)}%` : (v: number) => moneyAxis(v)" :value-formatter="valueFmt" :empty-range="emptyRange">
+    <TimeChart ref="tc" class="main-chart" :series="series" :height="mdAndUp ? 439 : 262" :legend-below="!mdAndUp" :show-y-axis="mode !== 'Value'" :y-formatter="isPct ? (v: number) => pctAxis(v) : (v: number) => moneyAxis(v)" :value-formatter="valueFmt" :empty-range="emptyRange">
       <template #legend>
         <div class="legend">
           <span v-for="l in legend" :key="l.n" class="li"><i :class="l.t" :style="{ background: l.c }" />{{ l.n }}</span>

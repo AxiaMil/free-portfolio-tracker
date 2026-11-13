@@ -20,7 +20,8 @@ const searching = ref(false);
 
 const txn = computed(() => activePortfolio.value?.transactions.find((t) => t.id === model.value) ?? null);
 const open = computed({ get: () => !!model.value, set: (v: boolean) => { if (!v) model.value = null; } });
-const warning = computed(() => result.value?.warnings.find((w) => w.id === model.value) ?? null);
+const warning = computed(() => result.value?.warnings.find((w) => w.id === model.value && w.kind === 'price') ?? null);
+const oversold = computed(() => result.value?.warnings.find((w) => w.id === model.value && w.kind === 'oversold') ?? null);
 
 watch(model, () => {
   const t = txn.value;
@@ -66,10 +67,7 @@ function setAction(a: Action) {
 /** the day's close for the ticker, in the same (split-unadjusted) terms as the trade */
 const closePrice = computed(() => {
   if (!warning.value) return null;
-  const mv = marketView.value;
-  const sym = warning.value.symbol;
-  const px = mv.priceAt(sym, warning.value.date);
-  return px == null ? null : px * mv.splitFactorAfter(sym, warning.value.date);
+  return marketView.value.tradedCloseAt(warning.value.symbol, warning.value.date);
 });
 
 function validate(): string | null {
@@ -109,6 +107,10 @@ function save() {
         <div>Price {{ fmtPrice(txn?.price) }} is outside the day's low–high range ({{ fmtPrice(warning.low) }} – {{ fmtPrice(warning.high) }}) for {{ warning.symbol }} on {{ warning.date }}.</div>
         <button v-if="closePrice != null" class="link" @click="form.price = String(+closePrice.toFixed(4))">Use the close price {{ fmtPrice(+closePrice.toFixed(4)) }}</button>
       </div>
+    </div>
+    <div v-if="oversold" class="warn">
+      <v-icon size="18" class="mr-2">mdi-alert-circle</v-icon>
+      <div class="flex-1">{{ oversold.message }}</div>
     </div>
     <div class="grid">
       <v-text-field v-model="form.date" type="date" label="Date" />

@@ -52,9 +52,11 @@ The app file never builds code from a string (no `eval` or `Function()`), so it 
 ### Cash, deposits and dividends
 
 - When a buy costs more than the cash in the portfolio, the app adds a **deposit** for the shortfall, unless margin is enabled. These rows show in *Transactions → Adjusted*.
-- With **Auto Dividend** on, dividends come from the instrument's dividend history: the shares you held before each ex-date times the dividend per share. They are paid after the instrument's usual ex-date → pay-date gap.
+- With **Auto Dividend** on, dividends come from the instrument's dividend history: the shares you held before each ex-date times the dividend per share. Each one counts from its ex-date, the day the share price drops by it, so your value doesn't dip while the payment is on its way. (Yahoo's free data has no payment dates.)
 - The portfolio's **dividend tax rate** is withheld automatically, as a *Taxes* entry next to each automatic dividend.
-- The **Dividends** page shows what reaches your cash: every amount, yield and calendar entry is net of that tax, and the headline prints gross − withholding = net. Dividends you enter yourself are taken as received, with nothing withheld.
+- The **Dividends** page shows what reaches your cash: every amount, yield and calendar entry is net of that tax, and the headline prints gross − withholding = net. Dividends you enter yourself are taken as received, with nothing withheld. A commission on one counts as a fee.
+- **Per holding** (the holdings table, a holding's details and each lot in Trade Analysis), dividends are also after that tax, and so are the holding's total gain and return. The **P&L breakdown** shows dividends before it, with the tax on the *Taxes* line.
+- The P&L breakdown always adds up: unrealised + realised + dividends + fees + taxes + interest + others = your value − your net deposits. Your value is always your cash plus the market value of your holdings.
 - **Upcoming** dividends come from announced ex-dates. **Estimated** ones repeat the last 12 months of payments. Yahoo's public endpoints don't include announced ex-dates, so in practice upcoming payments are projected from the last 12 months.
 
 ### Risk metrics
@@ -67,9 +69,13 @@ The app file never builds code from a string (no `eval` or `Function()`), so it 
 
 ### Lots, currencies and splits
 
-- **Lots:** FIFO or average cost, selectable in *Settings → Calculation Methods*. Realised gains, unrealised gains, fees and dividends are tracked per position.
-- **Currency conversion:** every value is converted to the portfolio's base currency at that day's FX rate (`USDSGD=X` style pairs, triangulated through USD when needed). Minor-unit quotes such as GBp are converted to the main unit.
-- **Splits:** price history is split-adjusted. You enter trades at the price you actually paid, and share counts are adjusted automatically.
+- **Lots:** FIFO or average cost, selectable in *Settings → Calculation Methods*. Realised gains, unrealised gains, fees and dividends are tracked per position. Cost and average cost don't include commissions, which count as fees.
+- **Transfers:** a transfer in adds shares at the value you enter, as money added. A transfer out takes them out at the value you enter, as money taken out, and the gain until then is realised.
+- **Selling more than you hold:** without margin, the Transactions page lists the sale under its warnings. The extra shares count as having cost nothing, so their whole sale price is gain, and the position ends at zero.
+- **Currency conversion:** every value is converted to the portfolio's base currency at that day's FX rate (`USDSGD=X` style pairs, or through USD when Yahoo has no direct pair). Minor-unit quotes such as GBp are converted to the main unit. If a rate can't be loaded at all, the home page names the currency, whose amounts then count 1:1 until it loads.
+- **Trades in another currency:** you can enter a trade in a currency other than the stock's own, such as a US stock bought in SGD. Its cost is converted at that day's rate. Its price, average cost and lots are shown in the stock's own currency, and it is checked against the day's range in that currency.
+- **Splits:** price history is split-adjusted. You enter trades at the price you actually paid, and share counts are adjusted automatically. The trade form fills in the day's close as it was quoted then: before later splits, and in pounds for London stocks quoted in pence. It updates that price when you change the date or ticker, until you type your own.
+- **Today's prices:** a quote is dated by its exchange's own calendar. Today's value uses each holding's latest price, the same one the holdings table shows, even when an exchange ahead of your time zone is already trading tomorrow.
 - **Country:** a holding's country comes from the exchange it trades on.
 
 ## Importing trades: the full CSV format
@@ -85,7 +91,10 @@ Date,Action,Ticker,Shares,Price,Currency,Commission,Note
 - **Columns:** headers are matched loosely, so `Symbol`, `Qty`, `Quantity`, `Type` or `Trade Date` also work. Comma, semicolon and tab separators are detected automatically.
 - **Tickers:** Yahoo Finance symbols, such as `AAPL`, `BN4.SI`, `0700.HK`, `VUSA.L` or `ASML.AS`.
 - **Currency:** `Market` means the instrument's own trading currency.
-- **Actions:** Buy, Sell, Deposit, Withdraw, Dividend, Stock dividend, Transfer in/out, Fees, Taxes, Interest income/expense, Other income/expense.
+- **Actions:** Buy, Sell, Deposit, Withdraw, Dividend, Stock dividend, Transfer in/out, Fees, Taxes, Interest income/expense, Other income/expense. Without an Action column, a negative quantity is a sale.
+- **Numbers:** `1,234.50`, `1.234,50`, `1 234,50` and `1'234.50` all work, as do currency signs. Semicolon-separated files use decimal commas.
+- **Dates:** `2024-03-15`, `15/03/2024`, `03/15/2024` or written out. The file's own dates decide which number is the day: any first number above 12 means day first, any second number above 12 means month first. When nothing tells, it's day first.
+- **Checks:** a row with an action the importer doesn't know, a date it can't read, or no shares is skipped and listed. A missing share price is filled in with that day's close and marked, for you to check before you import. A missing dividend amount is never guessed.
 
 ## Where your data is kept
 

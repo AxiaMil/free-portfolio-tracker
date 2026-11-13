@@ -98,7 +98,17 @@ const isCustom = computed(() => accent.value !== DEFAULT_ACCENT && !ACCENTS.some
 .sw { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; border: 1px solid var(--border); border-radius: 12px; background: transparent; color: var(--text-2); cursor: pointer; font: 12px var(--font); &:hover { background: var(--hover); } &.on { border-color: var(--c); color: var(--text); } }
 .dot { width: 30px; height: 30px; border-radius: 50%; background: var(--c); display: flex; align-items: center; justify-content: center; .v-icon { color: #fff; } }
 .custom .dot .v-icon { color: var(--text); }
-.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+// the colour picker's own input covers the tile and takes the press. It is fully visible to the browser (a
+// reachability check, such as Meta Muse's, reports an input at opacity 0 as hidden), but paints nothing: no box,
+// no border and no colour swatch, so the tile shows through.
+.custom input {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; border-radius: inherit; cursor: pointer;
+  appearance: none; -webkit-appearance: none; background: transparent; outline: none;
+  &::-webkit-color-swatch-wrapper { padding: 0; }
+  &::-webkit-color-swatch { border: 0; background: transparent !important; }
+  &::-moz-color-swatch { border: 0; background: transparent !important; }
+  &:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+}
 .preview { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
 .pv-nav { display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; border-radius: 10px; background: var(--nav-active-bg); color: var(--nav-active-fg); font-weight: 600; font-size: 14px; .v-icon { color: var(--nav-active-fg); } }
 .pv-btn { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 10px; background: var(--primary); color: var(--primary-fg); font-weight: 600; font-size: 13.5px; }

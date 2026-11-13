@@ -106,7 +106,15 @@ function fxPairs(symbols: string[]): string[] {
   for (const t of p.transactions) if (t.currency && t.currency !== 'Market') ccys.add(t.currency.toUpperCase());
   for (const c of p.customAssets) ccys.add(c.currency.toUpperCase());
   ccys.delete(p.currency);
-  return [...ccys].map((c) => fxSymbol(c, p.currency));
+  const out: string[] = [];
+  for (const c of ccys) {
+    const direct = fxSymbol(c, p.currency);
+    out.push(direct);
+    // a cross Yahoo doesn't list (its download came back empty) is converted through USD instead
+    const ch = market.value.charts[direct];
+    if (ch && !ch.bars?.length && c !== 'USD' && p.currency !== 'USD') out.push(fxSymbol(c, 'USD'), fxSymbol('USD', p.currency));
+  }
+  return [...new Set(out)];
 }
 
 async function loadCharts(symbols: string[], force = false) {
@@ -144,8 +152,10 @@ export async function refreshMarket(force = false, all = false) {
   try {
     // price histories first: the numbers on screen depend on them; FX pairs follow once currencies are known
     await loadCharts(pick([...assets, ...benches], market.value.charts), force);
-    const fx = fxPairs([...assets, ...benches]);
+    let fx = fxPairs([...assets, ...benches]);
     await loadCharts(pick(fx, market.value.charts), force);
+    const viaUsd = fxPairs([...assets, ...benches]).filter((s) => !fx.includes(s));
+    if (viaUsd.length) { await loadCharts(pick(viaUsd, market.value.charts), force); fx = [...fx, ...viaUsd]; }
     await loadQuotes([...assets, ...benches, ...fx], force);
     store.today = todayLocal();
   } catch (e) {

@@ -24,14 +24,18 @@ const big = computed(() => {
 });
 // in the device's own time zone, named: "2026-11-12 15:27:02.413 GMT+8"
 const lastUpdated = computed(() => (store.lastUpdated ? localTimestamp(store.lastUpdated) : ''));
+// together they add up to the portfolio's value minus its net deposits
+const DIV_TIP = 'Before withholding tax, which is under Taxes. Per holding, dividends are shown after it.';
 const pnlRows = computed(() => {
   const p = result.value?.pnl;
   if (!p) return [];
   return [
-    ['Unrealized Gains', p.unrealized], ['Realized Gains', p.realized], ['Dividends', p.dividends], ['Fees', p.fees],
+    ['Unrealized Gains', p.unrealized], ['Realized Gains', p.realized], ['Dividends', p.dividends, DIV_TIP], ['Fees', p.fees],
     ['Taxes', p.taxes], ['Interests', p.interests], ['Others', p.others],
-  ] as Array<[string, number]>;
+  ] as Array<[string, number, string?]>;
 });
+// a currency with no exchange rate yet is counted 1:1; say so once the first download is done
+const missingFx = computed(() => (store.loading ? [] : result.value?.missingFx ?? []));
 function togglePrivacy() {
   if (store.state) store.state.preferences.hideValues = !store.state.preferences.hideValues;
 }
@@ -57,6 +61,7 @@ function togglePrivacy() {
         <button v-if="!mdAndUp" class="info-btn" aria-label="Portfolio details" @click="infoOpen = true"><v-icon size="18">mdi-information</v-icon></button>
       </div>
       <div class="updated">Last Updated: {{ lastUpdated || '—' }}<span v-if="store.offline" class="offline"> · offline (cached prices)</span></div>
+      <div v-if="missingFx.length" class="updated offline" data-test="missing-fx">No exchange rate for {{ missingFx.join(', ') }} to {{ store.base }} yet: those amounts are counted as if 1 {{ missingFx[0] }} = 1 {{ store.base }}.</div>
     </div>
 
     <div v-if="mdAndUp" class="right">
@@ -96,7 +101,7 @@ function togglePrivacy() {
           </template>
           <template v-else-if="tab === 'P&L Breakdown'">
             <div class="rows">
-              <div v-for="[l, v] in pnlRows" :key="l" class="row"><span>{{ l }}</span><span :class="signClass(v)">{{ money(v, { sign: true }) }}</span></div>
+              <div v-for="[l, v, tip] in pnlRows" :key="l" class="row"><span>{{ l }}<HelpTip v-if="tip" class="ml-1" :size="12" :text="tip" /></span><span :class="signClass(v)">{{ money(v, { sign: true }) }}</span></div>
             </div>
           </template>
           <template v-else-if="tab === 'Gains & Returns'">
@@ -137,7 +142,7 @@ function togglePrivacy() {
             </div>
           </template>
           <template v-else-if="tab === 'P&L Breakdown'">
-            <div class="rows"><div v-for="[l, v] in pnlRows" :key="l" class="row"><span>{{ l }}</span><span :class="signClass(v)">{{ money(v, { sign: true }) }}</span></div></div>
+            <div class="rows"><div v-for="[l, v, tip] in pnlRows" :key="l" class="row"><span>{{ l }}<HelpTip v-if="tip" class="ml-1" :size="12" :text="tip" /></span><span :class="signClass(v)">{{ money(v, { sign: true }) }}</span></div></div>
           </template>
           <template v-else>
             <div class="rows"><div v-for="g in gainsAndReturns" :key="g.key" class="row"><span>Total Gain {{ g.label }}</span><span :class="signClass(g.res?.gain)">{{ g.res ? `${money(g.res.gain, { sign: true })} (${pct(g.res.pct)})` : '-' }}</span></div></div>

@@ -54,26 +54,35 @@ export function moneyAxis(v: number, ccy?: string): string {
   return `${c}${v < 0 ? '-' : ''}${s}`;
 }
 
-/** percentage from a ratio: 0.0022 -> "+0.22%"; huge values use exponent form (+9.62e+4%) */
+/**
+ * percentage from a ratio: 0.0022 -> "+0.22%". From 1,000% on, whole numbers with thousands separators
+ * (378.4 -> "+37,840%"), never an exponent.
+ */
 export function pct(r: number | null | undefined, opts: { sign?: boolean; decimals?: number } = {}): string {
   if (r == null || !isFinite(r)) return '-';
   const v = r * 100;
   const a = Math.abs(v);
-  let s: string;
-  if (a >= 10000) {
-    const e = Math.floor(Math.log10(a));
-    s = `${(a / 10 ** e).toFixed(2)}e+${e}`;
-  } else if (a >= 1000) s = num(a, 0).replace(/,/g, '');
-  else s = num(a, opts.decimals ?? 2);
-  const sign = v < 0 && s.replace(/[0.,e+]/g, '') !== '' ? '-' : opts.sign !== false && v >= 0 ? '+' : '';
+  const s = num(a, a >= 999.5 ? 0 : opts.decimals ?? 2);
+  // a value that rounds to zero gets no minus sign
+  const sign = v < 0 && /[1-9]/.test(s) ? '-' : opts.sign !== false && v >= 0 ? '+' : '';
   return `${sign}${s}%`;
 }
 
-/** allocation style: 2 decimals, tiny values keep 3 significant digits (0.0257%) */
+/** chart axis labels: "-12%", "0.5%", "37,800%" (one decimal only below 10%, where ticks can be that close) */
+export function pctAxis(r: number): string {
+  if (!isFinite(r)) return '';
+  const v = r * 100;
+  const d = Math.abs(v) < 10 && Math.abs(v - Math.round(v)) > 1e-9 ? 1 : 0;
+  return `${v < 0 && Math.abs(v) >= 0.05 ? '-' : ''}${num(Math.abs(v), d)}%`;
+}
+
+/** allocation style: 2 decimals; below 0.1% three significant digits (0.0257%); below 0.001% "<0.001%" */
 export function alloc(r: number | null | undefined): string {
   if (r == null || !isFinite(r)) return '-';
   const v = r * 100;
-  if (Math.abs(v) > 0 && Math.abs(v) < 0.1) return `${v.toPrecision(3)}%`;
+  const a = Math.abs(v);
+  if (a > 0 && a < 0.001) return v < 0 ? '>-0.001%' : '<0.001%';
+  if (a > 0 && a < 0.1) return `${v < 0 ? '-' : ''}${sep(a.toLocaleString('en-US', { minimumSignificantDigits: 3, maximumSignificantDigits: 3 }))}%`;
   return `${num(v, 2)}%`;
 }
 
@@ -84,9 +93,19 @@ export function shares(v: number | null | undefined): string {
   return num(v, 4);
 }
 
-export function price(v: number | null | undefined, d = 2): string {
+/**
+ * a price per share: 2 decimals, and more where they matter (SGX and HKEX quote 0.105 or 1.235), up to 3 from 1
+ * and 4 below 1. From 100 on, 2. An explicit `d` fixes the decimals.
+ */
+export function price(v: number | null | undefined, d?: number): string {
   if (v == null || !isFinite(v)) return '-';
-  return num(v, d);
+  if (d != null) return num(v, d);
+  const a = Math.abs(v);
+  const max = a >= 100 ? 2 : a >= 1 ? 3 : 4;
+  let k = 2;
+  const exact = (k: number) => { const x = a * 10 ** k; return Math.abs(Math.round(x) - x) < 1e-6 * Math.max(1, x); };
+  while (k < max && !exact(k)) k++;
+  return num(v, k);
 }
 
 export function signClass(v: number | null | undefined): string {

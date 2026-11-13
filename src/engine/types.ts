@@ -109,6 +109,8 @@ export interface ChartData {
 export interface Quote {
   symbol: string;
   price: number | null;
+  /** the exchange's offset from UTC in seconds, to date the quote by the exchange's own calendar */
+  gmtoffset?: number | null;
   prevClose: number | null;
   change: number | null;
   changePct: number | null;
@@ -163,6 +165,8 @@ export interface LedgerEntry {
   amountBase: number; // gross amount in base currency (positive)
   fx: number;
   auto: null | 'deposit' | 'dividend' | 'tax';
+  /** an automatic dividend's withholding tax, base currency (it is also booked as its own Taxes entry) */
+  taxBase?: number;
   status: 'confirmed' | 'upcoming';
   sourceId?: string;
   warning?: string;

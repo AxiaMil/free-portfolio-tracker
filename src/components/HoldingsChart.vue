@@ -7,7 +7,7 @@ import { useDisplay } from 'vuetify';
 import { result, marketView } from '../store.ts';
 import { periodBaseDate, type PeriodKey } from '../engine/periods.ts';
 import { AXIS_COLOR, FONT, GRID_COLOR, tooltipBase } from '../charts.ts';
-import { money, moneyAxis, pct } from '../format.ts';
+import { money, moneyAxis, pct, pctAxis } from '../format.ts';
 import PillToggle from './PillToggle.vue';
 
 const { mdAndUp } = useDisplay();
@@ -56,7 +56,7 @@ const items = computed(() => {
         const signed = e.action === 'Buy' || e.action === 'Transfer in' || e.action === 'Stock dividend' ? 1 : e.action === 'Sell' || e.action === 'Transfer out' ? -1 : 0;
         if (e.date <= base) sharesAt += signed * e.shares * f;
         else if (signed) { flows += signed * (e.amountBase + signed * e.commissionBase); if (signed > 0) buys += e.amountBase; }
-        else if (e.action === 'Dividend' && e.date > base) flows -= e.amountBase;
+        else if (e.action === 'Dividend' && e.date > base) flows -= e.amountBase - e.commissionBase - (e.taxBase ?? 0); // after withholding, as everywhere per holding
       }
       const p0 = mv.priceAt(h.symbol, base) ?? 0;
       const mv0 = sharesAt * p0 * mv.fxAt(ccy, base);
@@ -112,7 +112,7 @@ const option = computed(() => {
     grid: { left: 62, right: 12, top: 12, bottom: many ? 74 : 60 },
     tooltip: { ...tooltipBase, trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (ps: any[]) => `${ps[0].name}<br/><b>${fmt(ps[0].value)}</b>` },
     xAxis: { type: 'category', data: data.map((d) => d.name), axisLabel: { color: AXIS_COLOR, rotate: 45, fontSize: 12, interval: 0 }, axisLine: { lineStyle: { color: palette.axisLine } }, axisTick: { show: false } },
-    yAxis: { type: 'value', splitNumber: 3, axisLabel: { color: AXIS_COLOR, fontSize: 12, formatter: (v: number) => (metric.value === 'Gain (Value)' ? moneyAxis(v) : `${(v * 100).toFixed(0)}%`) }, splitLine: { lineStyle: { color: GRID_COLOR } } },
+    yAxis: { type: 'value', splitNumber: 3, axisLabel: { color: AXIS_COLOR, fontSize: 12, formatter: (v: number) => (metric.value === 'Gain (Value)' ? moneyAxis(v) : pctAxis(v)) }, splitLine: { lineStyle: { color: GRID_COLOR } } },
     dataZoom: [{ type: 'slider', show: true, height: 8, bottom: 4, startValue: 0, endValue: many ? (mdAndUp.value ? 21 : 8) : data.length - 1, showDetail: false, showDataShadow: false, brushSelect: false, borderColor: 'transparent', backgroundColor: palette.navigatorBg, fillerColor: palette.navigatorData, handleSize: 0, moveHandleSize: 0 }],
     series: [{ type: 'bar', barMaxWidth: 26, data: data.map((d) => ({ value: d.value, itemStyle: { color: d.value >= 0 ? palette.pos : palette.neg, borderRadius: d.value >= 0 ? [4, 4, 0, 0] : [0, 0, 4, 4] } })) }],
   };

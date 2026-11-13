@@ -18,8 +18,9 @@ export interface TradeLot {
   name: string;
   side: 'long' | 'short';
   openDate: string;
-  /** opening price per share in the trading currency (split-adjusted) */
+  /** opening price per share in the instrument's trading currency (split-adjusted), whatever currency the trade was entered in */
   price: number;
+  /** the instrument's trading currency */
   currency: string;
   /** original shares (split-adjusted) */
   shares: number;
@@ -30,7 +31,7 @@ export interface TradeLot {
   openFee: number;
   /** all commissions attributed to the lot (opening + its share of closing trades), base currency */
   fees: number;
-  /** dividends received on the lot's shares, base currency (gross, like the holdings table) */
+  /** dividends received on the lot's shares, base currency, after withholding tax (as in the holdings table) */
   dividends: number;
   /** gain on the closed part, before fees and dividends */
   realized: number;
@@ -125,9 +126,11 @@ export function buildTradeLots(ledger: LedgerEntry[], m: MarketView, o: LotOptio
 
     if (remaining > EPS && (opening || o.margin)) {
       const fee = remaining * feePerShare;
+      const ccy = m.currencyOf(e.symbol);
+      const price = (e.currency === ccy ? e.price : (e.price * e.fx) / m.fxAt(ccy, e.date)) / f;
       lots.push({
         id: `tl${++seq}`, symbol: e.symbol, name: m.name(e.symbol), side: opening ? 'long' : 'short', openDate: e.date,
-        price: e.price / f, currency: e.currency, shares: remaining, openShares: remaining, closedShares: 0,
+        price, currency: ccy, shares: remaining, openShares: remaining, closedShares: 0,
         costBasis: remaining * perShare, openFee: fee, fees: fee, dividends: 0, realized: 0, marketValue: 0, unrealized: 0,
         totalGain: 0, totalReturn: null, benchReturn: null, alpha: null, closeDate: null, endDate: o.today, holdingDays: 0, closes: [],
       });
@@ -144,7 +147,7 @@ export function buildTradeLots(ledger: LedgerEntry[], m: MarketView, o: LotOptio
       .filter(([, q]) => q > EPS);
     const tot = held.reduce((s, [, q]) => s + q, 0);
     if (tot <= EPS) continue;
-    const net = e.amountBase - e.commissionBase;
+    const net = e.amountBase - e.commissionBase - (e.taxBase ?? 0);
     for (const [l, q] of held) {
       const amt = (net * q) / tot;
       l.dividends += amt;

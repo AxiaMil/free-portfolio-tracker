@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { palette, alpha } from '../../theme.ts';
+import { palette } from '../../theme.ts';
 // "Historical Return": per month / quarter / year bars vs the main benchmark, with a heat-coloured table below.
 import { computed, ref, watch } from 'vue';
 import VChart from 'vue-echarts/csp';
@@ -8,7 +8,7 @@ import { benchName, result, store } from '../../store.ts';
 import { primaryBench } from '../../composables/stats.ts';
 import { HEAT_FULL, heatColor, historical, type Bucket, type BucketRow } from '../../engine/perf.ts';
 import { AXIS_COLOR, FONT, GRID_COLOR, tooltipBase } from '../../charts.ts';
-import { money, moneyAxis, pct, signClass } from '../../format.ts';
+import { money, moneyAxis, pct, pctAxis, signClass } from '../../format.ts';
 import PillToggle from '../PillToggle.vue';
 import HelpTip from '../HelpTip.vue';
 import ShareButton from '../ShareButton.vue';
@@ -43,6 +43,7 @@ const option = computed(() => {
   const benchVal = (d: BucketRow) => (isBal ? d.bench?.endValue ?? null : d.bench?.pct ?? null);
   const exVal = (d: BucketRow) => (isBal ? (d.port && d.bench ? d.port.gain - d.bench.gain : null) : d.excess);
   const wide = mobile ? 16 : 24;
+  const pair = mobile ? 11 : 16; // each bar of a portfolio / benchmark pair, side by side
   const series: any[] = [];
   if (excess.value) {
     series.push({
@@ -50,8 +51,10 @@ const option = computed(() => {
       data: data.map((d) => { const v = exVal(d); return { value: v, itemStyle: { color: (v ?? 0) >= 0 ? palette.pos : palette.neg, borderRadius: radius(v ?? 0) } }; }),
     });
   } else {
+    // your bar in green or red, the benchmark's beside it in the benchmark colour (as on the other charts), named in
+    // the legend below: a faded bar tucked behind yours read as a shadow
     series.push({
-      name: 'My Portfolio', type: 'bar', barWidth: wide, z: 3,
+      name: 'My Portfolio', type: 'bar', barWidth: pair, barGap: '30%',
       data: data.map((d) => {
         const v = portVal(d);
         const up = isBal ? (d.port?.gain ?? 0) >= 0 : (v ?? 0) >= 0;
@@ -59,11 +62,10 @@ const option = computed(() => {
       }),
     });
     series.push({
-      name: bn.value, type: 'bar', barWidth: mobile ? 8 : 11, barGap: '-15%', z: 2,
+      name: isBal ? `What if ${bn.value}` : bn.value, type: 'bar', barWidth: pair,
       data: data.map((d) => {
         const v = benchVal(d);
-        const up = isBal ? (d.bench?.gain ?? 0) >= 0 : (v ?? 0) >= 0;
-        return { value: v, itemStyle: { color: up ? alpha(palette.pos, 0.3) : alpha(palette.neg, 0.3), borderRadius: isBal ? [2, 2, 0, 0] : radius(v ?? 0) } };
+        return { value: v, itemStyle: { color: palette.bench, borderRadius: isBal ? [3, 3, 0, 0] : radius(v ?? 0) } };
       }),
     });
     if (isBal) {
@@ -107,7 +109,7 @@ const option = computed(() => {
     yAxis: {
       type: 'value',
       splitNumber: mobile ? 2 : 4,
-      axisLabel: { color: AXIS_COLOR, fontSize: 12, formatter: (v: number) => (isBal ? moneyAxis(v) : `${+(v * 100).toFixed(0)}%`) },
+      axisLabel: { color: AXIS_COLOR, fontSize: 12, formatter: (v: number) => (isBal ? moneyAxis(v) : pctAxis(v)) },
       splitLine: { lineStyle: { color: GRID_COLOR } },
     },
     dataZoom: [{
@@ -173,10 +175,10 @@ const METHOD_HELP = 'MWR (money-weighted, XIRR) counts the size and timing of yo
       <v-chart v-if="rows.length" ref="vchart" :option="option" autoresize />
       <div v-else class="empty muted">No history yet.</div>
     </div>
-    <div v-if="mode === 'Balance' && !excess && rows.length" class="blegend">
-      <span><i class="sq up" />My Portfolio (ending balance)</span>
-      <span><i class="sq dim" />What if {{ bn }}</span>
-      <span><i class="dash" />Net deposits</span>
+    <div v-if="!excess && rows.length" class="blegend" data-test="hr-legend">
+      <span><i class="sq split" />My Portfolio{{ mode === 'Balance' ? ' (ending balance)' : '' }}</span>
+      <span><i class="sq" :style="{ background: palette.bench }" />{{ mode === 'Balance' ? `What if ${bn}` : bn }}</span>
+      <span v-if="mode === 'Balance'"><i class="dash" />Net deposits</span>
     </div>
 
     <div v-if="mdAndUp" class="ctl">
@@ -237,7 +239,8 @@ const METHOD_HELP = 'MWR (money-weighted, XIRR) counts the size and timing of yo
 .ex { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-2); cursor: pointer; user-select: none; }
 .sw { position: relative; width: 38px; height: 22px; border: 0; background: none; padding: 0; cursor: pointer; flex: 0 0 auto;
   &::before { content: ''; position: absolute; left: 4px; right: 0; top: 4px; height: 14px; border-radius: 7px; background: var(--faint); transition: background-color 0.15s ease; }
-  i { position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 50%; background: var(--primary-text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); transition: transform 0.15s ease; }
+  // off: a grey knob on a grey track; on: a white knob on the accent track (a coloured knob read as "on")
+  i { position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); transition: transform 0.15s ease, background-color 0.15s ease; }
   &.on::before { background: var(--primary); }
   &.on i { transform: translateX(18px); background: var(--text); }
 }
@@ -245,8 +248,7 @@ const METHOD_HELP = 'MWR (money-weighted, XIRR) counts the size and timing of yo
 .blegend { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; margin-top: 6px; font-size: 12.8px; color: var(--text-2);
   span { display: inline-flex; align-items: center; gap: 6px; }
   .sq { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-  .sq.up { background: var(--pos); }
-  .sq.dim { background: var(--pos-soft); }
+  .sq.split { background: linear-gradient(135deg, var(--pos) 50%, var(--neg) 50%); }
   .dash { width: 16px; border-top: 1.5px dashed var(--text-2); display: inline-block; }
 }
 .empty { display: flex; height: 100%; align-items: center; justify-content: center; }

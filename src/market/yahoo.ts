@@ -74,6 +74,7 @@ export async function fetchQuotes(symbols: string[], get: GetJson, now = Date.no
         change: prev != null ? price - prev : null,
         changePct: finite(m.regularMarketChangePercent) ? m.regularMarketChangePercent : prev ? (price / prev - 1) * 100 : null,
         time: finite(m.regularMarketTime) ? m.regularMarketTime * 1000 : null,
+        gmtoffset: finite(m.gmtoffset) ? m.gmtoffset : null,
         marketState: null,
         currency: m.currency ?? null,
         name: m.longName || m.shortName || r.symbol,

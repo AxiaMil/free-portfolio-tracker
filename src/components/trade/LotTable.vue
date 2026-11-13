@@ -94,7 +94,7 @@ function csv() {
           </thead>
           <tbody>
             <tr v-for="l in paged" :key="l.id" :class="{ sel: selected === l.symbol }" @click="emit('chart', l.symbol)">
-              <td class="tick"><b>{{ l.symbol }}</b><span class="name">{{ l.name }}</span></td>
+              <td class="tick"><b>{{ l.symbol }}</b><span class="name" :title="l.name">{{ l.name }}</span></td>
               <td><span class="side" :class="l.side">{{ l.side }}</span></td>
               <td>{{ l.openDate }}</td>
               <td>{{ price(l.price) }}</td>
@@ -135,7 +135,7 @@ function csv() {
     <div v-else class="m">
       <div v-for="l in paged" :key="l.id" class="lcard" :class="{ sel: selected === l.symbol }">
         <div class="lc-head">
-          <div class="lc-title"><b>{{ l.symbol }}</b><span class="name">{{ l.name }}</span></div>
+          <div class="lc-title" :title="l.name"><b>{{ l.symbol }}</b><span class="name">{{ l.name }}</span></div>
           <span class="side" :class="l.side">{{ l.side }}</span>
           <button class="exp-btn" :aria-label="expanded.has(l.id) ? 'Collapse' : 'Expand'" :aria-expanded="expanded.has(l.id)" @click="toggle(l.id)">
             <v-icon size="22">{{ expanded.has(l.id) ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
@@ -195,7 +195,7 @@ function csv() {
 .lots tbody tr { cursor: pointer; }
 .lots tbody tr.sel td { background: var(--primary-soft); }
 .tick { min-width: 120px; b { display: block; font-size: 14px; line-height: 19px; } }
-.tick .name { display: block; font-size: 11.5px; line-height: 15px; color: var(--muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tick .name { font-size: 11.5px; line-height: 15px; color: var(--muted); max-width: 170px; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .side { display: inline-block; padding: 0 9px; border-radius: 9px; font-size: 12px; line-height: 19px; letter-spacing: 0.3px; }
 .side.long { background: var(--primary-soft); color: #6ea6f0; }
 .side.short { background: var(--neg-soft); color: var(--neg); }
@@ -217,7 +217,7 @@ function csv() {
 .lcard { border: 1px solid var(--border); border-radius: 16px; background: var(--surface); padding: 12px 12px 14px; margin-bottom: 9px; }
 .lcard.sel { border-color: var(--primary-soft); }
 .lc-head { display: flex; align-items: center; gap: 8px; }
-.lc-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; b { font-size: 17px; font-weight: 700; } .name { font-size: 12.5px; color: var(--text-2); margin-left: 5px; } }
+.lc-title { flex: 1; min-width: 0; line-height: 20px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; b { font-size: 17px; font-weight: 700; } .name { font-size: 12.5px; color: var(--text-2); margin-left: 5px; } }
 .lc-head .side { font-size: 12px; line-height: 19px; padding: 0 9px; }
 .exp-btn { background: none; border: 0; color: var(--text-2); cursor: pointer; display: inline-flex; padding: 0; margin-left: 4px; }
 .lc-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 0; }
@@ -228,7 +228,7 @@ function csv() {
 .lc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px 8px; margin-top: 8px;
   div { display: flex; flex-direction: column; min-width: 0; }
   span { font-size: 12.5px; color: var(--text-2); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  b { font-size: 14.5px; font-weight: 400; line-height: 22px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  b { font-size: 14.5px; font-weight: 400; line-height: 20px; margin-top: 1px; overflow-wrap: anywhere; } // a long amount wraps, never cut
 }
 .chart-cell { justify-content: flex-end; }
 .m-pager { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; font-size: 13px; letter-spacing: 0.3px; color: var(--text); .pg { color: var(--text-2); &:disabled { color: var(--border-strong); } } }
