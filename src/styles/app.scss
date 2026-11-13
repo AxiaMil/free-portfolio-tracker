@@ -135,6 +135,15 @@ body {
 @media (max-width: 959px) {
   .pill-group { padding: 3px; .pill { font-size: 12px; line-height: 18px; padding: 4px 11px; } }
 }
+// phones: a row of options never scrolls sideways, where its hidden scrollbar left the last options easy to miss.
+// Below 420px the options sit closer; a row that still doesn't fit continues on a second line.
+// (18px rounds a one-line row exactly as 999px does, and a two-line row as a rounded box.)
+@media (max-width: 599px) {
+  .pill-group { flex-wrap: wrap; overflow-x: visible; border-radius: 18px; }
+}
+@media (max-width: 419px) {
+  .pill-group .pill { padding: 4px 8px; }
+}
 
 // outlined action button (Share, Edit Plan, Total Return, Rebalance)
 .outline-btn {
@@ -294,6 +303,36 @@ body {
 .v-field--variant-outlined.v-field--focused .v-field__outline { color: var(--primary); }
 .v-field--variant-outlined { background: var(--surface); }
 .v-label { color: var(--muted) !important; opacity: 1 !important; }
+
+// The real <input> of a select, a combobox, a switch and a checkbox. Vuetify hides it: opacity 0 once a select (or an
+// unfocused combobox) has a value, and for a select also out of the pointer's reach (pointer-events: none), under
+// the selected text. What you see is that text, or the switch Vuetify draws. Reachability checks (Meta Muse runs one)
+// then report these inputs as hidden, unreachable controls. Here each input is visible and is what a press lands on,
+// but paints nothing of its own (no text, selection highlight, box or focus outline) where Vuetify hid it, so the
+// controls look and work as before. A press on a select's input still opens the menu: Vuetify toggles it on any
+// press in the field, and the browser focuses the input as Vuetify would. A focused combobox shows its input as
+// usual. `html` outranks Vuetify's own rules, whichever loads first.
+html .v-select .v-field .v-field__input > input {
+  pointer-events: auto;
+  cursor: pointer;
+}
+html .v-select--selected .v-field .v-field__input > input,
+html .v-combobox--single:not(.v-combobox--selection-slot) .v-field--dirty:not(.v-field--focused) input,
+html .v-autocomplete--single:not(.v-autocomplete--selection-slot) .v-field--dirty:not(.v-field--focused) input {
+  opacity: 1;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  &::selection { background: transparent; }
+}
+html .v-selection-control__input input {
+  opacity: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
 .v-tooltip > .v-overlay__content {
   background: var(--tooltip-bg) !important;
   color: var(--tooltip-fg) !important;

@@ -125,6 +125,7 @@ These were tested end to end at phone and laptop widths, with the one file loade
 - **Load failure:** an unreadable saved portfolio showed **Try again**, and nothing was saved over it.
 - **Every page and dialog** was checked at 360, 390, 768 and 1512 px wide, both empty and with data.
 - **Muse's style rewrite:** every page was also run from the one file with Muse's `x.style` rewrite applied and a copy of its checker in front, at 390 and 1300 px wide. No chart shape reached the checker, and every chart drew with a clean console.
+- **Phones:** at 360 and 366 px, every control on every page and in every dialog was checked, as a reachability check would: its effective opacity, visibility, size and `pointer-events`, clipping, and that a press at its centre lands on it. None was hidden or unreachable, including the inputs Vuetify normally hides inside selects, comboboxes, switches and checkboxes. No page scrolls sideways except wide data tables. Selects, the combobox and switches were also driven with real taps, clicks and keys.
 - **Other builds:** the multi-file `app/` folder was tested the same way. Without a bridge, the app still works fully on browser storage, and shows prices as offline until a route exists.
 
 The UI already fits Muse's phone view:

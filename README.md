@@ -271,6 +271,14 @@ Tap **Try again**. Your portfolio is safe: the app never saves over it when it c
 
 Your space has a copy from before 13 November 2026. Send Muse the prompt in [Update or repair your space](#update-or-repair-your-space). Your portfolio is kept.
 
+### Muse won't publish because the app "builds code from a string" or uses `Function()`.
+
+Muse is looking at an old copy of the app. Versions before 12 November 2026 had one such spot, in a chart check, and the current app has none. Send Muse the prompt in [Update or repair your space](#update-or-repair-your-space). It makes Muse fetch the app fresh and check that its copy is exact. Don't let Muse edit the file to get around the check.
+
+### Muse found a problem in the app and offered to fix it in the space.
+
+Ask it not to. A fix made only in your space is undone by the next update. [Report it on GitHub](https://github.com/AxiaMil/free-portfolio-tracker/issues) instead, so it's fixed in the app for everyone.
+
 ### A ticker can't be found.
 
 Search uses Yahoo Finance's ticker symbols, which add a suffix for many exchanges (`.SI` for Singapore, `.HK` for Hong Kong, `.L` for London). If Yahoo doesn't list it, add it as a **Custom Asset**.

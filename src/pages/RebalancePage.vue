@@ -134,7 +134,7 @@ const targetProps = computed(() =>
 .head { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
 .r-title { font-size: 20px; line-height: 28px; font-weight: 700; color: var(--text); margin: 0; white-space: nowrap; }
 .tb-lbl { font-size: 13px; color: var(--text-2); margin-right: -2px; }
-.tb { padding: 3px; :deep(.pill) { font-size: 12px; line-height: 16px; padding: 3px 11px; } }
+.tb { flex-shrink: 0; padding: 3px; :deep(.pill) { font-size: 12px; line-height: 16px; padding: 3px 11px; } }
 .reset {
   display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: var(--text); cursor: pointer;
   font: 600 13px/1 var(--font); letter-spacing: 1px; padding: 6px 4px;
@@ -183,7 +183,8 @@ const targetProps = computed(() =>
 // phone: two-line cards
 .rebal.m {
   .head { gap: 8px; margin-top: 16px; }
-  .reset { padding: 6px 0; }
+  .r-title { white-space: normal; min-width: 0; } // the narrowest phones: the title takes two lines, never the % / $ toggle's room
+  .reset { padding: 6px 0; flex-shrink: 0; }
   .rcard {
     grid-template-columns: 158px 1fr 130px;
     grid-template-areas: 'name val val' 'alloc arrow tgt';

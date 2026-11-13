@@ -75,4 +75,13 @@ const SUGGEST = Object.keys(BENCH_NAMES);
 .bchg { font-size: 13px; font-weight: 500; line-height: 20px; white-space: nowrap; }
 .bchg.pos { color: var(--pos) !important; }
 .bchg.neg { color: var(--neg) !important; }
+// phones: two cards per row (four benchmarks make two rows), in the order of the list, never scrolling sideways
+@media (max-width: 599px) {
+  .strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow-x: visible; }
+  .bchg { white-space: normal; }
+}
+// tablets: cards keep their width and continue on a new row when they don't fit
+@media (min-width: 600px) and (max-width: 959px) {
+  .strip { flex-wrap: wrap; overflow-x: visible; }
+}
 </style>
