@@ -4,11 +4,12 @@
 //
 // Plain TypeScript with no imports, so the same file runs in the Muse space's server (actions.ts), in `npm run dev`
 // and `npm start` (vite.config.ts), in Node or in a worker. Each connector only reads public data of its own hosts
-// (listed in `hosts`): no sign-up, no API key, no login and no cookies, so there is nothing for the user to set up.
+// (listed in `hosts`): no sign-up, no API key, no login and nothing of the user's, so there is nothing to set up.
 //
-// Holdings these don't cover (an NYSE share, a Hong Kong or London listing, ...) are the Muse space's own job: Muse
-// writes custom-payouts.ts for exactly the user's holdings, from public pages. Adding an exchange for everyone:
-// write a Connector (match the Yahoo symbols it covers, fetch, return PayoutRecords) and put it in CONNECTORS.
+// Holdings these don't cover (a Hong Kong or London listing, ...) can get the Muse space's own connector
+// (custom-payouts.ts). Without one, the app estimates each payment date from the company's usual schedule and marks
+// it as an estimate. Adding an exchange for everyone: write a Connector (match the Yahoo symbols it covers, fetch,
+// return PayoutRecords) and put it in CONNECTORS.
 
 /** one dividend as the company announced it. Dates are ISO yyyy-mm-dd in the exchange's own calendar. */
 export interface PayoutRecord {
@@ -31,7 +32,11 @@ export interface PayoutAsk {
   name?: string | null;
 }
 
-export type FetchLike = (url: string, init?: { headers?: Record<string, string>; signal?: AbortSignal }) => Promise<{ status: number; text(): Promise<string> }>;
+export type FetchLike = (url: string, init?: { headers?: Record<string, string>; signal?: AbortSignal }) => Promise<{
+  status: number;
+  text(): Promise<string>;
+  headers?: { get(name: string): string | null; getSetCookie?: () => string[] };
+}>;
 
 export interface Connector {
   id: string;
@@ -41,10 +46,12 @@ export interface Connector {
   /** every host it reads; a Muse space allows exactly these (manifest.json, network) */
   hosts: string[];
   matches(a: PayoutAsk): boolean;
-  fetch(a: PayoutAsk, get: GetText): Promise<PayoutRecord[]>;
+  fetch(a: PayoutAsk, get: GetText, raw: GetRaw): Promise<PayoutRecord[]>;
 }
 
 type GetText = (url: string, headers?: Record<string, string>) => Promise<string>;
+/** the whole answer, with the cookies it sets (only the Yahoo connector needs them) */
+type GetRaw = (url: string, headers?: Record<string, string>) => Promise<{ status: number; body: string; cookies: string[] }>;
 
 const TIMEOUT_MS = 20_000;
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
@@ -54,7 +61,13 @@ const iso = (s: unknown): string | null => (typeof s === 'string' && ISO.test(s)
 /** "11/24/2026" (US style) -> "2026-11-24"; "N/A", "None" and anything else -> null */
 export function usDate(s: unknown): string | null {
   const m = typeof s === 'string' ? s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/) : null;
-  return m ? `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}` : null;
+  const [, mm = '', dd = '', yyyy = ''] = m ?? [];
+  return m ? `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}` : null;
+}
+/** Yahoo dates are epoch seconds at midnight UTC of the day */
+export function epochDate(s: unknown): string | null {
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? new Date(n * 1000).toISOString().slice(0, 10) : null;
 }
 /** SGX dates are epoch milliseconds at midnight Singapore time (UTC+8) */
 export function sgtDate(ms: unknown): string | null {
@@ -93,13 +106,13 @@ const sgx: Connector = {
       if (r?.anncType && String(r.anncType).toUpperCase() !== 'DIVIDEND') continue;
       const exDate = sgtDate(r?.exDate);
       if (!exDate) continue;
-      const rate = String(r?.particulars ?? '').match(/Rate:\s*([A-Z]{3})\s*([0-9.]+)/i);
+      const [, rateCcy, rateAmt] = String(r?.particulars ?? '').match(/Rate:\s*([A-Z]{3})\s*([0-9.]+)/i) ?? [];
       const cur = by.get(exDate) ?? { exDate, payDate: null, recordDate: sgtDate(r?.recDate), amount: null, currency: null, source: 'sgx' };
       const paid = sgtDate(r?.datePaid);
       if (paid && (!cur.payDate || paid > cur.payDate)) cur.payDate = paid;
-      if (rate) {
-        cur.amount = Math.round(((cur.amount ?? 0) + Number(rate[2])) * 1e8) / 1e8;
-        cur.currency = rate[1].toUpperCase();
+      if (rateCcy && rateAmt) {
+        cur.amount = Math.round(((cur.amount ?? 0) + Number(rateAmt)) * 1e8) / 1e8;
+        cur.currency = rateCcy.toUpperCase();
       }
       by.set(exDate, cur);
     }
@@ -151,8 +164,56 @@ const asx: Connector = {
   },
 };
 
+// ---------------------------------------------------------------- US: Yahoo Finance (latest dividend)
+// Nasdaq lists no NYSE shares, but Yahoo publishes each US company's latest ex-date and payment date. Its quote
+// service wants an anonymous session: a cookie from fc.yahoo.com and a "crumb" token for it, nothing of the user's.
+
+const YAHOO_UA = 'Mozilla/5.0 (portfolio-tracker)';
+const SESSION_MS = 6 * 3600_000;
+const sessions = new WeakMap<object, { cookie: string; crumb: string; at: number }>();
+
+async function yahooSession(raw: GetRaw, key: object, fresh = false): Promise<{ cookie: string; crumb: string }> {
+  const known = sessions.get(key);
+  if (known && !fresh && Date.now() - known.at < SESSION_MS) return known;
+  const start = await raw('https://fc.yahoo.com/', { 'User-Agent': YAHOO_UA });
+  const cookie = start.cookies.map((c) => c.split(';')[0]?.trim() ?? '').filter((c) => c.startsWith('A3=')).join('; ');
+  if (!cookie) throw new Error('Yahoo gave no session');
+  // the crumb comes as plain text: asked for as JSON, Yahoo answers 406
+  const crumb = (await raw('https://query1.finance.yahoo.com/v1/test/getcrumb', { 'User-Agent': YAHOO_UA, Accept: '*/*', Cookie: cookie })).body.trim();
+  if (!crumb || crumb.length > 40 || /[{<\s]/.test(crumb)) throw new Error('Yahoo gave no crumb');
+  const s = { cookie, crumb, at: Date.now() };
+  sessions.set(key, s);
+  return s;
+}
+
+const DAY_MS = 86_400_000;
+const yahoo: Connector = {
+  id: 'yahoo',
+  name: 'Yahoo Finance',
+  covers: 'US-listed shares and ETFs, NYSE included: each latest dividend, kept as they build up',
+  hosts: ['fc.yahoo.com', 'query1.finance.yahoo.com'],
+  // Yahoo's US symbols have no market suffix (KO, BRK-B); indices (^GSPC) and FX (USDSGD=X) pay nothing
+  matches: (a) => !/[.^=]/.test(a.symbol) && (!a.currency || a.currency.toUpperCase() === 'USD'),
+  async fetch(a, _get, raw) {
+    const quote = async (fresh: boolean) => {
+      const s = await yahooSession(raw, raw, fresh);
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(a.symbol)}&fields=exDividendDate,dividendDate,currency&crumb=${encodeURIComponent(s.crumb)}`;
+      return raw(url, { 'User-Agent': YAHOO_UA, Accept: 'application/json', Cookie: s.cookie });
+    };
+    let res = await quote(false);
+    if (res.status === 401 || res.status === 403) res = await quote(true); // the session ran out: one new one
+    const q = json(res.body)?.quoteResponse?.result?.[0];
+    const exDate = epochDate(q?.exDividendDate);
+    if (!exDate) return [];
+    // Yahoo can still show the previous dividend's payment date beside a new ex-date: keep it only when it follows
+    const pay = epochDate(q?.dividendDate);
+    const days = pay ? (Date.parse(pay) - Date.parse(exDate)) / DAY_MS : -1;
+    return [{ exDate, payDate: pay && days >= 0 && days <= 100 ? pay : null, amount: null, currency: q?.currency ?? 'USD', source: 'yahoo' }];
+  },
+};
+
 /** in the order they are tried: the first that answers with records wins */
-export const CONNECTORS: Connector[] = [sgx, nasdaq, asx];
+export const CONNECTORS: Connector[] = [sgx, nasdaq, asx, yahoo];
 export const PAYOUT_HOSTS = [...new Set(CONNECTORS.flatMap((c) => c.hosts))];
 
 /** the built-in connectors that cover a holding; none means it is the Muse space's own connector's job */
@@ -160,14 +221,24 @@ export function connectorsFor(a: PayoutAsk): Connector[] {
   return CONNECTORS.filter((c) => c.matches(a));
 }
 
-function textGetter(fetchImpl: FetchLike): GetText {
+function rawGetter(fetchImpl: FetchLike): GetRaw {
   return async (url, headers) => {
     const host = new URL(url).hostname;
     if (!PAYOUT_HOSTS.includes(host)) throw new Error(`payouts: ${host} is not a connector host`);
     const res = await fetchImpl(url, { headers: { 'User-Agent': BROWSER_UA, Accept: 'application/json', ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (res.status === 429) throw new Error(`payouts: ${host} is busy (HTTP 429)`);
-    return res.text();
+    const h = res.headers;
+    const cookies = h?.getSetCookie?.() ?? (h?.get('set-cookie') ? [h.get('set-cookie') ?? ''] : []);
+    return { status: res.status, body: await res.text(), cookies };
   };
+}
+// one raw getter per fetch function, so a Yahoo session is reused between holdings
+const raws = new WeakMap<FetchLike, GetRaw>();
+function getters(fetchImpl: FetchLike): { get: GetText; raw: GetRaw } {
+  let raw = raws.get(fetchImpl);
+  if (!raw) raws.set(fetchImpl, (raw = rawGetter(fetchImpl)));
+  const r = raw;
+  return { raw: r, get: async (url, headers) => (await r(url, headers)).body };
 }
 
 export interface PayoutResult {
@@ -186,11 +257,11 @@ export type CustomPayouts = (a: PayoutAsk) => Promise<PayoutRecord[] | null>;
  * as `error`, with no records, so the caller keeps what it had.
  */
 export async function fetchPayouts(a: PayoutAsk, fetchImpl: FetchLike = fetch as unknown as FetchLike, custom?: CustomPayouts): Promise<PayoutResult> {
-  const get = textGetter(fetchImpl);
+  const { get, raw } = getters(fetchImpl);
   let error: string | undefined;
   for (const c of connectorsFor(a)) {
     try {
-      const records = clean(await c.fetch(a, get));
+      const records = clean(await c.fetch(a, get, raw));
       if (records.length) return { symbol: a.symbol, records, source: c.id };
     } catch (e) {
       error = `${c.id}: ${e instanceof Error ? e.message : String(e)}`;
@@ -213,7 +284,8 @@ export function clean(records: PayoutRecord[]): PayoutRecord[] {
   for (const r of records) {
     const exDate = iso(r?.exDate);
     if (!exDate) continue;
-    const payDate = iso(r.payDate) && r.payDate! >= exDate ? r.payDate : null;
+    const pay = iso(r.payDate);
+    const payDate = pay && pay >= exDate ? pay : null;
     const amount = typeof r.amount === 'number' && Number.isFinite(r.amount) ? r.amount : null;
     const prev = by.get(exDate);
     if (prev && prev.payDate && !payDate) continue; // keep the one that has a date

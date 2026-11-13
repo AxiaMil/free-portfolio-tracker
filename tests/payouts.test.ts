@@ -2,7 +2,7 @@
 // answers in each exchange's own format: no network. Run with `npm test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CONNECTORS, PAYOUT_HOSTS, clean, connectorsFor, fetchPayouts, mergePayouts, sgtDate, usDate, type PayoutRecord } from '../muse/server/src/payouts.ts';
+import { CONNECTORS, PAYOUT_HOSTS, clean, connectorsFor, epochDate, fetchPayouts, mergePayouts, sgtDate, usDate, type PayoutRecord } from '../muse/server/src/payouts.ts';
 import { getPayouts, refreshMarketCache, updatePayouts, type PayoutKit, type SnapshotRow, type SnapshotStore } from '../muse/server/src/market.ts';
 
 /** a fetch that answers each URL from `routes` (by substring) and records what was asked */
@@ -25,19 +25,24 @@ test('dates: US style and SGX epoch milliseconds become yyyy-mm-dd', () => {
   assert.equal(usDate('N/A'), null);
   assert.equal(sgtDate(sgt('2026-11-24')), '2026-11-24');
   assert.equal(sgtDate(null), null);
+  assert.equal(epochDate(Date.UTC(2026, 11, 1) / 1000), '2026-12-01');
+  assert.equal(epochDate(undefined), null);
 });
 
 test('which connector covers which listing', () => {
   const ids = (symbol: string, exchange: string | null) => connectorsFor({ symbol, exchange }).map((c) => c.id);
   assert.deepEqual(ids('ABC.SI', 'SES'), ['sgx']);
   assert.deepEqual(ids('CBA.AX', 'ASX'), ['asx']);
-  assert.deepEqual(ids('AAPL', 'NMS'), ['nasdaq']);
-  assert.deepEqual(ids('AAPL', 'NasdaqGS'), ['nasdaq']);
-  // NYSE, Hong Kong, London: none built in; the Muse space's own connector covers them
-  assert.deepEqual(ids('KO', 'NYQ'), []);
+  // Nasdaq listings: Nasdaq's full history first, Yahoo's latest if Nasdaq fails; NYSE: Yahoo
+  assert.deepEqual(ids('AAPL', 'NMS'), ['nasdaq', 'yahoo']);
+  assert.deepEqual(ids('AAPL', 'NasdaqGS'), ['nasdaq', 'yahoo']);
+  assert.deepEqual(ids('KO', 'NYQ'), ['yahoo']);
+  assert.deepEqual(ids('BRK-B', 'NYQ'), ['yahoo']);
+  assert.deepEqual(ids('^GSPC', 'SNP'), []);
+  // Hong Kong, London: none built in; estimated, or the Muse space's own connector
   assert.deepEqual(ids('0700.HK', 'HKG'), []);
   assert.deepEqual(ids('VOD.L', 'LSE'), []);
-  assert.deepEqual(PAYOUT_HOSTS, ['api.sgx.com', 'api.nasdaq.com', 'asx.api.markitdigital.com']);
+  assert.deepEqual(PAYOUT_HOSTS, ['api.sgx.com', 'api.nasdaq.com', 'asx.api.markitdigital.com', 'fc.yahoo.com', 'query1.finance.yahoo.com']);
   for (const c of CONNECTORS) assert.ok(!('needsKey' in c), `${c.id} needs nothing set up`);
 });
 
@@ -83,12 +88,40 @@ test('ASX: the latest dividend', async () => {
   assert.deepEqual(r.records, [{ exDate: '2026-08-19', payDate: '2026-09-29', recordDate: null, amount: 2.7, currency: 'AUD', source: 'asx' }]);
 });
 
+test('Yahoo: one anonymous session for every US holding, the latest dividend, and a stale payment date dropped', async () => {
+  const asked: string[] = [];
+  const day = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 1000;
+  const quotes: Record<string, unknown> = {
+    KOX: { exDividendDate: day('2026-12-01'), dividendDate: day('2026-12-15'), currency: 'USD' },
+    OLDX: { exDividendDate: day('2026-12-01'), dividendDate: day('2026-09-15'), currency: 'USD' }, // the previous one's
+  };
+  const f = async (url: string, init?: { headers?: Record<string, string> }) => {
+    asked.push(url);
+    if (url.startsWith('https://fc.yahoo.com')) return { status: 404, text: async () => '', headers: { get: () => null, getSetCookie: () => ['A3=d=abc; Domain=.yahoo.com; Path=/', 'B=x'] } };
+    assert.equal(init?.headers?.Cookie, 'A3=d=abc', 'only the session cookie is sent');
+    if (url.includes('/getcrumb')) return { status: 200, text: async () => 'Crumb9' };
+    const sym = new URL(url).searchParams.get('symbols') ?? '';
+    assert.equal(new URL(url).searchParams.get('crumb'), 'Crumb9');
+    return { status: 200, text: async () => JSON.stringify({ quoteResponse: { result: [{ symbol: sym, ...(quotes[sym] as object) }] } }) };
+  };
+  const ko = await fetchPayouts({ symbol: 'KOX', exchange: 'NYQ', currency: 'USD' }, f);
+  assert.equal(ko.source, 'yahoo');
+  assert.deepEqual(ko.records, [{ exDate: '2026-12-01', payDate: '2026-12-15', recordDate: null, amount: null, currency: 'USD', source: 'yahoo' }]);
+  const old = await fetchPayouts({ symbol: 'OLDX', exchange: 'NYQ', currency: 'USD' }, f);
+  assert.deepEqual(old.records.map((r) => [r.exDate, r.payDate]), [['2026-12-01', null]]);
+  assert.equal(asked.filter((u) => u.startsWith('https://fc.yahoo.com')).length, 1, 'the session is reused');
+  // no session: an error, never a throw
+  const blocked = await fetchPayouts({ symbol: 'KOX', exchange: 'NYQ' }, async () => ({ status: 403, text: async () => '' }));
+  assert.equal(blocked.source, null);
+  assert.match(blocked.error ?? '', /yahoo: Yahoo gave no session/);
+});
+
 test('no built-in connector: the space\'s own one is asked; with none, no records and no error', async () => {
   const f = fakeFetch({});
-  const none = await fetchPayouts({ symbol: 'KO', exchange: 'NYQ' }, f);
-  assert.deepEqual(none, { symbol: 'KO', records: [], source: null });
-  const custom = async (a: { symbol: string }) => (a.symbol === 'KO' ? [{ exDate: '2026-09-15', payDate: '2026-10-01', source: '' }] : null);
-  const own = await fetchPayouts({ symbol: 'KO', exchange: 'NYQ' }, f, custom);
+  const none = await fetchPayouts({ symbol: 'VOD.L', exchange: 'LSE' }, f);
+  assert.deepEqual(none, { symbol: 'VOD.L', records: [], source: null });
+  const custom = async (a: { symbol: string }) => (a.symbol === 'VOD.L' ? [{ exDate: '2026-09-15', payDate: '2026-10-01', source: '' }] : null);
+  const own = await fetchPayouts({ symbol: 'VOD.L', exchange: 'LSE' }, f, custom);
   assert.equal(own.source, 'custom');
   assert.deepEqual(own.records.map((x) => [x.exDate, x.payDate, x.source]), [['2026-09-15', '2026-10-01', 'custom']]);
 });

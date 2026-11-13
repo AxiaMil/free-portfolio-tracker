@@ -8,8 +8,10 @@ The main README has two copy-and-paste prompts: one to [create a space](../READM
 - `howToUse.newSpace` and `howToUse.existingSpace`: the steps for each case. Updating keeps every saved row and removes whatever earlier versions or later edits left behind.
 - `app`, `files` and `starterParts`: what to copy and where. `app.bytes` and `app.sha256` let Muse check that its copy of the app is exact. `npm run build:app` writes them.
 - `spaceOwnFiles`: files that belong to the user's space, created once from a template and never replaced by an update.
-- `storage`, `actions`, `network`, `networkOwn`, `cron` and `time`: what the space needs.
-- `payouts`: where dividend payment dates come from, and `payouts.forMuse`, the steps Muse follows to connect a source for holdings no built-in one covers.
+- `storage`, `actions`, `network`, `networkOwn`, `cron` and `time`: what the space needs. `approvals` says what each address and the job are for, so Muse can tell the user what they approve.
+- `typescript`: the files pass a strict TypeScript check as shipped (a Bun project's defaults, `noUncheckedIndexedAccess` included), and what Muse does if its build disagrees.
+- `payouts`: where dividend payment dates come from. `payouts.forMuse` is optional, only when the user asks: Muse connects a source for holdings no built-in one covers.
+- `finish`: what Muse tells the user at the end: each check's result, anything that didn't go as planned, and how to start.
 - `checks`: what to look at when it's done.
 
 When you change the space, change the manifest with it, not the prompts. `npm test` fails when they drift apart:
@@ -31,8 +33,8 @@ A fork uses its own repository URL in the prompts, in `repository` here and in `
 | [`client/src/host.ts`](client/src/host.ts) | `client/src/host.ts` | `window.portfolioHost`: storage and market data through the server actions. Retries the first portfolio load while a phone's bridge is still starting |
 | [`server/src/actions.ts`](server/src/actions.ts) | `server/src/actions.ts` | The seven server actions |
 | [`server/src/market.ts`](server/src/market.ts) | `server/src/market.ts` | The yahooGet allow-list, the market snapshot and the scheduled refresh (no dependencies) |
-| [`server/src/payouts.ts`](server/src/payouts.ts) | `server/src/payouts.ts` | Dividend payment dates from SGX, Nasdaq and the ASX: public data, no key (no dependencies) |
-| [`server/src/custom-payouts.ts`](server/src/custom-payouts.ts) | `server/src/custom-payouts.ts` | The space's own payment-date connector. A template, created once: Muse fills it in for the user's holdings, and updates never replace it |
+| [`server/src/payouts.ts`](server/src/payouts.ts) | `server/src/payouts.ts` | Dividend payment dates from SGX, Nasdaq, Yahoo Finance and the ASX: public data, no key (no dependencies) |
+| [`server/src/custom-payouts.ts`](server/src/custom-payouts.ts) | `server/src/custom-payouts.ts` | The space's own, optional payment-date connector. A template, created once: Muse fills it in only when the user asks, and updates never replace it |
 | [`server/src/schema.ts`](server/src/schema.ts) | `server/src/schema.ts` | Two Drizzle tables: `app_state` and `market_cache` |
 | [`space.json`](space.json) | `space.json` | Name, entry and the 10-minute refresh job |
 
@@ -65,15 +67,18 @@ In documents that refuse `history.pushState`, the app falls back to `#hash` navi
 
 On phones, the bottom navigation and full-screen dialogs keep clear of the phone's home bar and notch. Times, such as Home's *Last Updated*, show in the device's own time zone.
 
-## Dividend payment dates, set up by Muse
+## Dividend payment dates
 
-Nothing here needs an account or an API key. SGX, Nasdaq and the ASX publish their dividend dates openly, so those connectors work as soon as the user approves their addresses. A holding none of them covers (a New York Stock Exchange or Hong Kong share, for example) shows **Ask your Muse** in *Settings → Dividend Dates*, with a request to copy. Muse then follows `payouts.forMuse` in the manifest: it finds a public, keyless source for those holdings, writes it into `server/src/custom-payouts.ts`, and adds its addresses to the space's network access, which the user approves. That file belongs to the user's space, so updating the space never replaces it. If no such source exists, the user can still type a payment date on the Dividends page.
+Nothing here needs an account or an API key, and nothing needs setting up beyond approving the addresses. SGX, Nasdaq and the ASX publish their dividend dates openly. For other US shares (NYSE included), Yahoo Finance gives each latest dividend's dates through an anonymous session. A holding none of them covers (a Hong Kong or London share, for example) gets estimated dates: the company's usual wait after the ex-date, shown with a ~.
+
+Exact dates for those are optional. *Settings → Dividend Dates* gives the user a request to send their Muse, which then follows `payouts.forMuse` in the manifest: it finds a public, keyless source, writes it into `server/src/custom-payouts.ts`, and adds its addresses to the space's network access, which the user approves. That file belongs to the user's space, so updating the space never replaces it. Setting up or updating a space never does this step.
 
 ## Tests
 
 `npm test` from the repository root (Node 23.6 or newer) covers this folder with plain Node and no network:
 - `server/src/market.ts`, against a fixed fake Yahoo: the allow-list, the scheduled refresh, the snapshot, and a round trip into the app (what the refresh stores is what the app opens on).
-- `server/src/payouts.ts`, against made-up answers in each exchange's own format: which connector covers which listing, dates and amounts, the space's own connector, failures reported and never thrown, and the daily look-up.
+- `server/src/payouts.ts`, against made-up answers in each exchange's own format: which connector covers which listing, dates and amounts, Yahoo's session, the space's own connector, failures reported and never thrown, and the daily look-up.
+- every file of the space under a Bun project's strict TypeScript settings (`tests/muse-typecheck/`), so a space never has to patch one to build.
 - `client/src/host.ts`, with a fake in place of the starter's `./api`: the retried first load, and a failed load that throws instead of returning an empty portfolio.
 - `src/platform/style-tunnel.ts`, against a copy of Muse's style checker: chart shapes keep their own values, and page elements still go through Muse.
 - `app/portfolio-tracker.js`, the file the space copies: it must build no code from strings.

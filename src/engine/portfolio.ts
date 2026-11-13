@@ -78,16 +78,22 @@ export function resolveTxns(p: Portfolio, m: MarketView): LedgerEntry[] {
   return out.sort((a, b) => a.date.localeCompare(b.date) || (ORDER[a.action] ?? 9) - (ORDER[b.action] ?? 9));
 }
 
-/** usual days from ex-date to payment, for projected payouts only: the latest published ones, else the profile, else 0 */
-function payLag(m: MarketView, symbol: string): number {
-  const lags = (m.payoutInfo(symbol)?.records ?? []).filter((r) => r.payDate).slice(0, 4).map((r) => daysBetween(r.exDate, r.payDate!)).filter((x) => x >= 0 && x <= 120);
-  if (lags.length) return lags.sort((a, b) => a - b)[Math.floor(lags.length / 2)];
+/** a typical wait from ex-date to payment where a company's own isn't known: US listings mostly pay within 2-4 weeks */
+export const DEFAULT_PAY_LAG = { us: 21, other: 30 };
+
+/**
+ * usual days from ex-date to payment for this holding, to estimate a payment date that isn't published: its own
+ * published dates (the median of the latest 4), else Yahoo's profile, else a typical wait for its market
+ */
+export function payLag(m: MarketView, symbol: string): number {
+  const lags = (m.payoutInfo(symbol)?.records ?? []).flatMap((r) => (r.payDate ? [daysBetween(r.exDate, r.payDate)] : [])).slice(0, 4).filter((x) => x >= 0 && x <= 120);
+  if (lags.length) return lags.sort((a, b) => a - b)[Math.floor(lags.length / 2)] ?? 0;
   const p = m.profile(symbol);
   if (p?.exDividendDate && p?.dividendDate) {
     const lag = daysBetween(p.exDividendDate, p.dividendDate);
     if (lag >= 0 && lag <= 120) return lag;
   }
-  return 0;
+  return symbol.includes('.') ? DEFAULT_PAY_LAG.other : DEFAULT_PAY_LAG.us;
 }
 
 /** shares held (split-adjusted) strictly before `date`; entries in date order. Without margin, never below zero. */
@@ -128,8 +134,9 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
 
   // ---------- auto dividends (+ withholding tax) ----------
   // A dividend is income on its ex-date (the share price drops by it that morning), so it counts in value and gains
-  // from then. Its cash arrives on the payment date the company published, from an exchange connector or typed by
-  // you: until then it is "to be paid". With no published date it stays to be paid; it is never guessed.
+  // from then. Its cash arrives on its payment date: the one the company published (from a connector) or you typed.
+  // Until then it is "to be paid". Where no date is published, the date is estimated from the company's usual wait
+  // (payLag) and shown as an estimate; it never stays unpaid for ever.
   const autoEntries: LedgerEntry[] = [];
   const dividendEvents: DividendEvent[] = [];
   const firstDate = user.length ? user[0].date : today;
@@ -139,23 +146,25 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       if (m.custom.has(sym)) continue;
       const ccy = m.currencyOf(sym);
       const manual = user.filter((e) => e.symbol === sym && e.action === 'Dividend');
+      let lag: number | undefined; // worked out once, for the first dividend without a published date
       for (const [exDate, perShare] of m.dividends(sym)) {
         if (exDate <= firstDate) continue;
         const shares = sharesBefore(user, sym, exDate, m, p.margin);
         if (shares <= 1e-9) continue;
         const typed = p.payDates?.[`${sym}|${exDate}`];
         const rec = m.payoutFor(sym, exDate);
-        const payDate = typed && typed >= exDate ? typed : rec?.payDate ?? null;
+        const known = typed && typed >= exDate ? typed : rec?.payDate ?? null;
         const paySource = typed && typed >= exDate ? 'you' : rec?.payDate ? rec.source : null;
-        if (manual.some((x) => x.date >= addDays(exDate, -5) && x.date <= addDays(payDate ?? exDate, 20))) continue;
+        const payDate = known ?? addDays(exDate, (lag ??= payLag(m, sym)));
+        if (manual.some((x) => x.date >= addDays(exDate, -5) && x.date <= addDays(payDate, 20))) continue;
         const ahead = exDate > today;
-        const paid = !ahead && payDate != null && payDate <= today;
+        const paid = !ahead && payDate <= today;
         // converted on the day it is paid; until then at today's rate
-        const fx = m.fxAt(ccy, paid ? payDate! : today);
+        const fx = m.fxAt(ccy, paid ? payDate : today);
         const amountLocal = perShare * shares;
         const taxBase = amountLocal * fx * taxRate;
         dividendEvents.push({
-          symbol: sym, exDate, payDate: payDate ?? exDate, payKnown: payDate != null, paySource, perShare, shares, currency: ccy,
+          symbol: sym, exDate, payDate, payKnown: known != null, paySource, perShare, shares, currency: ccy,
           amountBase: amountLocal * fx, taxBase, status: ahead ? 'confirmed' : paid ? 'received' : 'toBePaid',
         });
         autoEntries.push({
@@ -477,12 +486,13 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
     const prof = m.profile(sym);
     const lastAmt = hist.length ? hist[hist.length - 1][1] : 0;
     const known = upcoming.filter((u) => u.symbol === sym);
-    // announced by the company (an exchange connector lists it), with its own amount and dates
+    // announced by the company (a connector lists it), with its own dates; an amount it doesn't give is the last one paid
     for (const r of m.payoutInfo(sym)?.records ?? []) {
-      if (r.exDate <= today || r.amount == null || !(r.amount > 0) || (r.currency && r.currency !== h.currency)) continue;
+      const amt = r.amount != null && r.amount > 0 ? r.amount : lastAmt;
+      if (r.exDate <= today || !(amt > 0) || (r.amount != null && r.currency && r.currency !== h.currency)) continue;
       if (known.some((k) => Math.abs(daysBetween(k.exDate, r.exDate)) <= 3)) continue;
-      const amountBase = r.amount * h.shares * fxNow;
-      const ev: DividendEvent = { symbol: sym, exDate: r.exDate, payDate: r.payDate ?? r.exDate, payKnown: !!r.payDate, paySource: r.payDate ? r.source : null, perShare: r.amount, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'confirmed' };
+      const amountBase = amt * h.shares * fxNow;
+      const ev: DividendEvent = { symbol: sym, exDate: r.exDate, payDate: r.payDate ?? addDays(r.exDate, lag), payKnown: !!r.payDate, paySource: r.payDate ? r.source : null, perShare: amt, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'confirmed' };
       upcoming.push(ev);
       known.push(ev);
     }

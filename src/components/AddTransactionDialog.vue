@@ -45,6 +45,15 @@ watch(() => store.addDialog.open, (open) => {
 
 const paged = computed(() => rows.value.slice((page.value - 1) * perPage.value, page.value * perPage.value));
 const pages = computed(() => Math.max(1, Math.ceil(rows.value.length / perPage.value)));
+/** pages only matter past the smallest page size */
+const showPager = computed(() => rows.value.length > 10);
+/** "Discard All" only when there is something to discard */
+const canDiscard = computed(() => rows.value.length > 1 || rows.value.some((r) => r.symbol || r.shares || r.note));
+function discardAll() {
+  rows.value = [blankRow()];
+  page.value = 1;
+}
+const countText = (n: number) => (n ? `${n} transaction${n === 1 ? '' : 's'}` : 'No transactions yet');
 
 function addRow(copy?: Row) {
   rows.value.push(copy ? { ...copy, key: uid('r') } : blankRow());
@@ -150,12 +159,18 @@ function choose(id: string) {
           <button class="x" aria-label="Close" @click="store.addDialog.open = false"><v-icon size="20">mdi-close</v-icon></button>
         </div>
         <div class="body1">
-          <div v-for="p in store.state?.portfolios" :key="p.id" class="pf-row">
-            <span>{{ p.name }}</span>
-            <button class="add-circle" :aria-label="`Add to ${p.name}`" @click="choose(p.id)"><v-icon size="20">mdi-plus</v-icon></button>
+          <div class="pick">Choose the portfolio to add to</div>
+          <button v-for="p in store.state?.portfolios" :key="p.id" class="pf-row add-circle" :aria-label="`Add to ${p.name}`" @click="choose(p.id)">
+            <span class="pf-t">
+              <span class="pf-n">{{ p.name }}</span>
+              <span class="pf-s">{{ countText(p.transactions.length) }} · {{ p.currency }}</span>
+            </span>
+            <span class="plus"><v-icon size="20">mdi-plus</v-icon></span>
+          </button>
+          <div class="pf-more">
+            <button class="mini-btn" @click="createPortfolio">+ Create Portfolio</button>
+            <button class="link-btn" @click="store.addDialog.open = false; router.push('/menu/portfolio')"><v-icon size="14">mdi-cog</v-icon> Portfolio Settings</button>
           </div>
-          <button class="mini-btn mt-6" @click="createPortfolio">+ Create Portfolio</button>
-          <button class="link-btn mt-3" @click="store.addDialog.open = false; router.push('/menu/portfolio')"><v-icon size="13">mdi-cog</v-icon> Portfolio Settings</button>
         </div>
         <div class="foot1"><v-spacer /><button class="text-btn save" @click="store.addDialog.open = false">Done</button></div>
       </template>
@@ -171,9 +186,11 @@ function choose(id: string) {
         <div class="bar">
           <span class="pname">{{ activePortfolio?.name }}</span>
           <v-spacer />
-          <button class="discard" @click="rows = [blankRow()]; page = 1"><v-icon size="16">mdi-delete</v-icon> Discard All</button>
-          <button class="dark-btn" @click="fileInput?.click()"><v-icon size="18">mdi-cloud-upload</v-icon> Upload Files</button>
-          <button class="primary-btn" @click="addRow()">+ Add Transaction</button>
+          <button v-if="canDiscard" class="discard" @click="discardAll"><v-icon size="16">mdi-delete</v-icon> Discard All</button>
+          <template v-if="mdAndUp">
+            <button class="dark-btn" @click="fileInput?.click()"><v-icon size="18">mdi-cloud-upload</v-icon> Upload Files</button>
+            <button class="primary-btn" @click="addRow()">+ Add Transaction</button>
+          </template>
         </div>
         <v-card-text class="rows-wrap">
           <div v-for="(r, i) in paged" :key="r.key" class="trow">
@@ -199,8 +216,9 @@ function choose(id: string) {
                 </v-card>
               </v-menu>
               <span class="div" />
+              <!-- an empty ticker is null to the field: with '' it counts as chosen and hides its placeholder -->
               <v-combobox
-                v-model="r.symbol"
+                :model-value="r.symbol || null"
                 :items="search[r.key] ?? []"
                 item-title="symbol"
                 item-value="symbol"
@@ -216,16 +234,16 @@ function choose(id: string) {
                 class="f-ticker"
                 no-filter
                 @update:search="(q: string) => onSearch(r, q)"
-                @update:model-value="autofillPrice(r)"
+                @update:model-value="(v: string | null) => { r.symbol = v ?? ''; autofillPrice(r); }"
               >
                 <template #item="{ props, item }">
                   <v-list-item v-bind="props" :title="item.raw.symbol" :subtitle="`${item.raw.name} · ${item.raw.exchange}`" />
                 </template>
               </v-combobox>
               <span class="div" />
-              <v-text-field v-model="r.shares" :label="isCash(r.action) ? 'Amount' : 'Shares'" type="number" density="compact" variant="outlined" hide-details class="f-shares" />
+              <v-text-field v-model="r.shares" :label="isCash(r.action) ? 'Amount' : 'Shares'" type="number" persistent-placeholder density="compact" variant="outlined" hide-details class="f-shares" />
               <span class="div" />
-              <v-text-field v-model="r.price" :label="r.action === 'Dividend' ? 'Per share' : 'Price'" type="number" density="compact" variant="outlined" hide-details class="f-price" />
+              <v-text-field v-model="r.price" :label="r.action === 'Dividend' ? 'Per share' : 'Price'" type="number" persistent-placeholder density="compact" variant="outlined" hide-details class="f-price" />
               <span class="div" />
               <v-select v-model="r.currency" :items="CURRENCIES" label="Currency" density="compact" variant="outlined" hide-details class="f-ccy" />
               <span class="div" />
@@ -238,23 +256,28 @@ function choose(id: string) {
             </div>
             <v-text-field v-if="r.open" v-model="r.note" label="Note" density="compact" variant="outlined" hide-details class="f-note" />
             <div v-if="i === paged.length - 1" class="add-more">
-              <button class="primary-btn" @click="addRow()"><v-icon size="18">mdi-plus</v-icon>Transaction</button>
-              <button class="mini-btn mt-3" @click="fileInput?.click()"><v-icon size="16">mdi-cloud-upload</v-icon> Upload Files</button>
+              <!-- on a phone the buttons sit here, under the rows; on a laptop they are in the bar above -->
+              <template v-if="!mdAndUp">
+                <button class="primary-btn wide" @click="addRow()"><v-icon size="18">mdi-plus</v-icon>Add Transaction</button>
+                <button class="outline-btn wide" @click="fileInput?.click()"><v-icon size="18">mdi-cloud-upload</v-icon>Upload Files</button>
+              </template>
               <div class="hint">CSV columns: Date, Action, Ticker, Shares, Price, Currency, Commission</div>
             </div>
           </div>
         </v-card-text>
         <div class="foot">
-          <div class="pager">
+          <div v-if="showPager" class="pager">
             <span>{{ (page - 1) * perPage + 1 }}-{{ Math.min(page * perPage, rows.length) }} of {{ rows.length }} results</span>
             <button class="pg" :disabled="page === 1" aria-label="Previous page" @click="page--"><v-icon>mdi-menu-left</v-icon></button>
             <span class="vdiv" />
             <button class="pg" :disabled="page >= pages" aria-label="Next page" @click="page++"><v-icon>mdi-menu-right</v-icon></button>
-            <span class="ml-4">Page</span>
-            <v-select v-model="page" :items="Array.from({ length: pages }, (_, k) => k + 1)" density="compact" variant="outlined" hide-details class="pgsel" />
-            <span>out of {{ pages }}</span>
-            <span class="ml-4">Rows per page:</span>
-            <template v-for="(n, k) in [10, 50, 100]" :key="n"><span v-if="k" class="sep">|</span><button class="per-link" :class="{ on: perPage === n }" @click="perPage = n; page = 1">{{ n }}</button></template>
+            <template v-if="mdAndUp">
+              <span class="ml-4">Page</span>
+              <v-select v-model="page" :items="Array.from({ length: pages }, (_, k) => k + 1)" density="compact" variant="outlined" hide-details class="pgsel" />
+              <span>out of {{ pages }}</span>
+              <span class="ml-4">Rows per page:</span>
+              <template v-for="(n, k) in [10, 50, 100]" :key="n"><span v-if="k" class="sep">|</span><button class="per-link" :class="{ on: perPage === n }" @click="perPage = n; page = 1">{{ n }}</button></template>
+            </template>
           </div>
           <div class="actions">
             <button class="text-btn" @click="store.addDialog.open = false">Cancel</button>
@@ -273,11 +296,21 @@ function choose(id: string) {
 .title { font-size: 20px; font-weight: 600; line-height: 28px; color: var(--text); }
 .x { background: none; border: 0; color: var(--text); cursor: pointer; margin-left: auto; display: inline-flex; padding: 4px; }
 .x.back { margin-left: 4px; margin-right: 0; }
-.body1 { padding: 20px 20px 32px; min-height: 210px; display: flex; flex-direction: column; align-items: flex-start; }
-.pf-row { display: flex; align-items: center; justify-content: space-between; width: 100%; font-size: 16px; padding: 6px 8px 6px 4px; }
-.add-circle { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border-strong); background: transparent; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; &:hover { background: var(--hover); } }
-.mini-btn { display: inline-flex; align-items: center; gap: 6px; height: 27px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; color: var(--text); font: 600 12px/1 var(--font); letter-spacing: 1px; cursor: pointer; &:hover { background: var(--hover); } }
-.link-btn { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; color: var(--text); font: 600 12px/1 var(--font); letter-spacing: 1px; cursor: pointer; margin-left: 12px; }
+// step 1 fills the dialog, so its footer sits at the bottom
+.body1 { flex: 1 1 auto; overflow-y: auto; padding: 20px 20px 28px; min-height: 210px; display: flex; flex-direction: column; gap: 10px; }
+.pick { font-size: 13.5px; color: var(--text-2); margin-bottom: 2px; }
+.pf-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 12px 12px 16px; text-align: left;
+  border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer;
+  &:hover { background: var(--hover); }
+}
+.pf-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pf-n { font-size: 16px; font-weight: 600; line-height: 21px; overflow-wrap: anywhere; }
+.pf-s { font-size: 12.5px; line-height: 17px; color: var(--text-2); }
+.plus { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: var(--primary-fg); display: inline-flex; align-items: center; justify-content: center; }
+.pf-more { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: 10px; }
+.mini-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; color: var(--text); font: 600 12px/1 var(--font); letter-spacing: 1px; cursor: pointer; &:hover { background: var(--hover); } }
+.link-btn { display: inline-flex; align-items: center; gap: 8px; height: 30px; background: none; border: 0; color: var(--text); font: 600 12px/1 var(--font); letter-spacing: 1px; cursor: pointer; }
 .foot1 { display: flex; align-items: center; min-height: 52px; padding: 0 20px; border-top: 1px solid var(--border); }
 .text-btn { background: none; border: 0; color: var(--text-2); font: 700 14px/1 var(--font); letter-spacing: 1.25px; cursor: pointer; padding: 8px; }
 .text-btn.save { color: var(--primary-text); }
@@ -304,8 +337,9 @@ function choose(id: string) {
 .f-comm { width: 102px; flex: none; }
 .f-note { width: 100%; flex: none; }
 .row-actions { display: flex; gap: 8px; margin-left: auto; button { background: none; border: 0; color: var(--text-2); cursor: pointer; display: inline-flex; &:hover { color: var(--text); } } }
-.add-more { width: 100%; display: flex; flex-direction: column; align-items: center; margin-top: 12px; }
-.hint { color: var(--muted); font-size: 11.5px; margin-top: 10px; text-align: center; }
+.add-more { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 12px; }
+.wide { width: 100%; height: 42px; justify-content: center; }
+.hint { color: var(--muted); font-size: 11.5px; line-height: 16px; text-align: center; }
 .action-menu { background: var(--surface-3) !important; min-width: 220px; }
 .am-tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); button { background: none; border: 0; color: var(--muted); padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 600; } button.on { background: var(--surface-3); color: var(--text); } }
 .foot { border-top: 1px solid var(--border); padding: 8px 16px 6px; font-size: 15px; color: var(--text-2); }
@@ -320,11 +354,12 @@ function choose(id: string) {
   // full screen: keep the header clear of the status bar and the buttons clear of the home bar
   .atd { padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
   .rows-wrap { min-height: 0; }
-  .bar { padding: 10px 16px; .pname { font-size: 18px; width: 100%; } }
+  .bar { padding: 8px 8px 8px 16px; flex-wrap: nowrap; .pname { font-size: 18px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .discard { flex: none; height: 36px; } }
+  .body1 { padding: 16px 16px 24px; }
   .div { display: none; }
   .f-date, .f-action, .f-ccy, .f-shares, .f-price, .f-comm { width: calc(50% - 4px); }
   .f-ticker { width: 100%; }
-  .trow { border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 8px; }
+  .trow { border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 8px; &:last-child { border-bottom: 0; margin-bottom: 0; } }
   .row-actions { width: 100%; justify-content: flex-end; }
   .bar { gap: 8px; }
   .pager { gap: 6px; font-size: 13px; }

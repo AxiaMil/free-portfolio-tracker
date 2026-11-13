@@ -87,9 +87,11 @@ When it's ready, go through the manifest's "checks" and tell me the result.
 
 ### Step 2: Say yes to the market data addresses
 
-Muse asks whether the space may connect to Yahoo Finance and to three stock exchanges: SGX (Singapore), Nasdaq and the ASX (Australia). Approve them all. Yahoo Finance gives prices, dividends and exchange rates; the exchanges give the dates dividends are paid. Only ticker symbols such as `AAPL` are sent, never your amounts.
+Muse asks whether the space may connect to a few addresses, and says what each one is for. Approve them all:
+- Yahoo Finance, for prices, dividends and exchange rates;
+- SGX (Singapore), Nasdaq, the ASX (Australia) and Yahoo, for the dates dividends are paid.
 
-If you hold shares none of those cover, such as a New York Stock Exchange or Hong Kong share, Muse sets up a source for them itself, from the exchange's or the company's own announcements. It asks you to approve those addresses too. There's no account or key to set up.
+Only ticker symbols such as `AAPL` are sent, never your amounts. There's no account or key to set up, and nothing else to do: when Muse is done, it tells you how to add your first transaction.
 
 ### Step 3: Add your investments
 
@@ -169,7 +171,7 @@ This tracker isn't perfect for everyone. The downsides:
 - **Prices come from Yahoo Finance's free feed.** It can be delayed, depending on the exchange, and is sometimes unavailable. When that happens, the app shows the last prices it had.
 - **No tax reports, price alerts or news.** It shows the gain on every trade and exports everything to a spreadsheet, but it doesn't make tax forms or send alerts.
 - **Upcoming dividends are estimates** until the company announces them, based on what each holding paid over the last 12 months.
-- **Payment dates come from the exchanges.** SGX, Nasdaq and the ASX are built in. For anything else, your Muse connects a source made for you, or you type the date.
+- **Payment dates come from the exchanges.** Singapore, US (NYSE included) and Australian shares get the company's published dates. For other markets, such as Hong Kong or London, the app estimates each date from the company's usual schedule and marks it with a ~. You can type the exact date, or ask your Muse to connect a source.
 - **No support team.** It's a free open-source project. You can report problems on [GitHub](https://github.com/AxiaMil/free-portfolio-tracker/issues).
 
 ## Screenshots
@@ -296,7 +298,7 @@ If you've set a dividend tax rate (*Settings → Portfolio Settings*), the Divid
 
 A dividend has two dates. On the **ex-dividend date** the share price drops by the dividend, and the dividend becomes yours. On the **payment date**, weeks later sometimes, the money arrives. From the ex-dividend date the app counts the dividend in your value and gains, as *to be paid*. It adds it to your cash only on the payment date the company published. Until then it shows under **Dividends to be paid**, next to your cash.
 
-Payment dates come from SGX, Nasdaq and the ASX, and from a source your Muse sets up for anything else. *Settings → Dividend Dates* shows where each holding's dates come from. If one says **Ask your Muse**, tap **Copy request** and send it to your Muse. You can also type any payment date yourself: tap it on the Dividends page.
+Payment dates come from SGX, Nasdaq, Yahoo Finance and the ASX. Where none is published (shares in Hong Kong or London, for example, or an older dividend), the app estimates the date from the company's usual wait after the ex-dividend date, shows it with a ~, and counts the dividend as paid once that date has passed. *Settings → Dividend Dates* shows where each holding's dates come from. For exact dates, type them on the Dividends page (tap the date), or tap **Copy request** there and send it to your Muse.
 
 ### Is this financial advice?
 

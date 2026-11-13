@@ -52,14 +52,16 @@ const dm = (v: number) => money(v, { decimals: Math.abs(v) >= 100 ? 0 : 2 });
 const plain = (v: number | null | undefined) => (hidden() ? '••••' : num(v ?? null, 2));
 const labelClass = (l: DivLabel) => (l === 'Confirmed' ? 'conf' : l === 'Paid' ? 'recv' : l === 'To be paid' ? 'due' : 'est');
 const LABEL_HELP: Record<DivLabel, string> = {
-  Paid: 'Paid into your cash on its payment date.',
+  Paid: 'Paid into your cash on its payment date (a date marked ~ is estimated).',
   'To be paid': 'Past its ex-dividend date, so it counts in your value and gains; it reaches your cash on its payment date.',
   Confirmed: 'Announced by the company: the ex-dividend date is ahead.',
   Estimated: 'Projected from last year\'s payout of the same period, adjusted for the latest dividend growth.',
 };
-/** the pay date as shown: the date, or a note when the company's isn't published here */
-const payText = (e: DivEvent) => (e.payKnown ? e.payDate : e.status === 'estimated' ? `~${e.payDate}` : 'Not published');
-const payTip = (e: DivEvent) => (e.payKnown ? `Payment date from ${sourceName(e.paySource)}` : e.status === 'estimated' ? 'Estimated from the usual time between ex-date and payment' : 'The payment date isn\'t published here yet');
+/** the pay date as shown: the published date, or ~ an estimate where none is published here */
+const payText = (e: DivEvent) => (e.payKnown ? e.payDate : `~${e.payDate}`);
+const payTip = (e: DivEvent) => (e.payKnown ? `Payment date from ${sourceName(e.paySource)}`
+  : e.status === 'estimated' ? 'Estimated from the usual time between ex-date and payment'
+    : 'Estimated: no payment date is published here, so it uses the company\'s usual wait after the ex-date. Tap to type the actual date.');
 /** automatic dividends past their ex-date: you can type or correct the payment date */
 const canEdit = (e: DivEvent) => !e.manual && (e.status === 'received' || e.status === 'toBePaid');
 const editing = ref<DivEvent | null>(null);
@@ -81,10 +83,10 @@ function showTransactions(symbol: string) {
 function csv(): Array<Array<string | number>> {
   if (view.value === 'Position') {
     return [['Ticker', 'Shares', 'Market Value', 'Div per Share (12M)', 'Projected Income (12M)', 'Yield', 'Yield on Cost', 'Received (TTM)', 'Next Ex-Date', 'Next Pay Date'],
-      ...posRows.value.map((r) => [r.symbol, r.shares, r.marketValue.toFixed(2), r.annualPerShare.toFixed(4), r.projected.toFixed(2), (r.yield * 100).toFixed(2) + '%', (r.yieldOnCost * 100).toFixed(2) + '%', r.receivedTTM.toFixed(2), r.nextEx ?? '', r.nextPay ?? ''])];
+      ...posRows.value.map((r) => [r.symbol, r.shares, r.marketValue.toFixed(2), r.annualPerShare.toFixed(4), r.projected.toFixed(2), (r.yield * 100).toFixed(2) + '%', (r.yieldOnCost * 100).toFixed(2) + '%', r.receivedTTM.toFixed(2), r.nextEx ?? '', r.nextPay ? `${r.nextPayKnown ? '' : '~'}${r.nextPay}` : ''])];
   }
   if (group.value === 'Transaction') {
-    return [['Ticker', 'Ex-Date', 'Pay Date', 'Pay Date Source', 'Status', 'Div per Share', 'Shares', 'Amount'], ...txRows.value.map((e) => [e.symbol, e.exDate, e.payKnown ? e.payDate : '', e.payKnown ? sourceName(e.paySource) : '', e.label, e.perShareBase.toFixed(4), e.shares, e.amountBase.toFixed(2)])];
+    return [['Ticker', 'Ex-Date', 'Pay Date', 'Pay Date Source', 'Status', 'Div per Share', 'Shares', 'Amount'], ...txRows.value.map((e) => [e.symbol, e.exDate, e.payDate, e.payKnown ? sourceName(e.paySource) : 'estimated', e.label, e.perShareBase.toFixed(4), e.shares, e.amountBase.toFixed(2)])];
   }
   const ms = win.value.months;
   return [['Ticker', ...ms, 'Total'], ...pivot.value.rows.map((r) => [r.symbol, ...ms.map((m) => (r.cells[m] ?? 0).toFixed(2)), r.total.toFixed(2)]), ['Total', ...ms.map((m) => (pivot.value.totals[m] ?? 0).toFixed(2)), pivot.value.total.toFixed(2)]];
@@ -188,7 +190,7 @@ function csv(): Array<Array<string | number>> {
                 <td class="num">{{ pct(r.yieldOnCost, { sign: false }) }}</td>
                 <td class="num">{{ money(r.receivedTTM) }}</td>
                 <td>{{ r.nextEx ?? '-' }}</td>
-                <td :class="{ unk: r.nextEx && !r.nextPay }">{{ r.nextPay ?? (r.nextEx ? 'Not published' : '-') }}</td>
+                <td :class="{ unk: r.nextPay && !r.nextPayKnown }">{{ r.nextPay ? (r.nextPayKnown ? r.nextPay : `~${r.nextPay}`) : '-' }}</td>
               </tr>
               <tr v-if="!posRows.length"><td colspan="10" class="empty">No dividend-paying holdings</td></tr>
             </tbody>
@@ -228,7 +230,7 @@ function csv(): Array<Array<string | number>> {
         </template>
         <template v-else>
           <div v-for="r in pagedPos" :key="r.symbol" class="dcard">
-            <div class="dc-h"><span class="sym">{{ r.symbol }}</span><span class="date">{{ r.nextPay ? `next paid ${r.nextPay}` : r.nextEx ? `next ex ${r.nextEx}` : '' }}</span></div>
+            <div class="dc-h"><span class="sym">{{ r.symbol }}</span><span class="date">{{ r.nextPay ? `next paid ${r.nextPayKnown ? '' : '~'}${r.nextPay}` : r.nextEx ? `next ex ${r.nextEx}` : '' }}</span></div>
             <div class="dc-r"><span>Projected (12M)</span><span>{{ plain(r.projected) }}</span></div>
             <div class="dc-r"><span>Shares</span><span>{{ plain(r.shares) }}</span></div>
             <div class="dc-r"><span>Yield</span><span>{{ pct(r.yield, { sign: false }) }}</span></div>

@@ -8,7 +8,7 @@ import { museRequest, sourceName } from '../div/payoutSources.ts';
 
 const route = computed(() => { void market.value; return payoutRoute(); });
 
-interface Row { symbol: string; name: string; status: 'ok' | 'muse' | 'none' | 'waiting'; text: string; unpublished: number }
+interface Row { symbol: string; name: string; status: 'ok' | 'muse' | 'none' | 'waiting'; text: string; estimated: number }
 
 const rows = computed<Row[]>(() => {
   const r = result.value;
@@ -18,7 +18,8 @@ const rows = computed<Row[]>(() => {
   for (const h of r.holdings) {
     if (h.isCustom || !market.value.charts[h.symbol]?.dividends?.length) continue;
     const info = payouts[h.symbol];
-    const unpublished = r.dividends.filter((d) => d.symbol === h.symbol && d.status === 'toBePaid' && !d.payKnown).length;
+    // paid or to be paid on an estimated date (projected ones are estimates anyway)
+    const estimated = r.dividends.filter((d) => d.symbol === h.symbol && !d.payKnown && (d.status === 'received' || d.status === 'toBePaid')).length;
     let status: Row['status'];
     let text: string;
     if (info?.source) {
@@ -27,12 +28,12 @@ const rows = computed<Row[]>(() => {
       text = `From ${sourceName(info.source)}${latest ? `: latest paid ${latest.payDate}` : ''}`;
     } else if (info) {
       status = route.value === 'host' ? 'muse' : 'none';
-      text = route.value === 'host' ? 'No built-in source: ask your Muse' : 'No source here: type its dates on the Dividends page';
+      text = 'No built-in source: dates are estimated from its usual schedule';
     } else {
       status = 'waiting';
       text = route.value === null ? 'Not looked up: no connection to the exchanges here' : 'Not looked up yet';
     }
-    out.push({ symbol: h.symbol, name: h.name, status, text, unpublished });
+    out.push({ symbol: h.symbol, name: h.name, status, text, estimated });
   }
   return out.sort((a, b) => (a.status === b.status ? a.symbol.localeCompare(b.symbol) : a.status === 'muse' ? -1 : b.status === 'muse' ? 1 : 0));
 });
@@ -57,13 +58,14 @@ async function copy() {
 <template>
   <div class="sec">
     <p class="intro">
-      A dividend counts in your value from its ex-dividend date, as <b>to be paid</b>, and reaches your cash on the payment date the company
-      published. The dates come from the exchanges' own data: SGX (Singapore), Nasdaq and ASX (Australia), with nothing to set up.
+      A dividend counts in your value from its ex-dividend date, as <b>to be paid</b>, and reaches your cash on its payment date, the one the company
+      published. Payment dates come from SGX (Singapore), Nasdaq, Yahoo Finance (US shares, NYSE included) and the ASX (Australia), with nothing
+      to set up. Where none is published, the date is estimated from the company's usual schedule and shown with a ~.
     </p>
 
     <div v-if="forMuse.length" class="muse" data-test="ask-muse">
-      <div class="m-h"><v-icon size="18">mdi-creation</v-icon>Ask your Muse for {{ forMuse.join(', ') }}</div>
-      <p class="m-d">No built-in source covers {{ forMuse.length === 1 ? 'this holding' : 'these holdings' }}. Your Muse can connect one made for you: send it this.</p>
+      <div class="m-h"><v-icon size="18">mdi-creation</v-icon>Optional: exact dates for {{ forMuse.join(', ') }}</div>
+      <p class="m-d">Their payment dates are estimated now. For the exact ones, your Muse can try to connect a source made for you: send it this.</p>
       <div class="req">{{ request }}</div>
       <button class="btn-primary" data-test="copy-request" @click="copy"><v-icon size="17">mdi-content-copy</v-icon>Copy request</button>
     </div>
@@ -74,7 +76,7 @@ async function copy() {
       <v-icon size="18" class="pi" :class="r.status">{{ r.status === 'ok' ? 'mdi-check-circle' : r.status === 'muse' ? 'mdi-creation' : 'mdi-help-circle-outline' }}</v-icon>
       <div class="pt">
         <div class="ps"><b>{{ r.symbol }}</b><span class="pn" :title="r.name">{{ r.name }}</span></div>
-        <div class="pd">{{ r.text }}<template v-if="r.unpublished"> · {{ r.unpublished }} to be paid without a published date</template></div>
+        <div class="pd">{{ r.text }}<template v-if="r.estimated && r.status === 'ok'"> · {{ r.estimated }} older {{ r.estimated === 1 ? 'date' : 'dates' }} estimated</template></div>
       </div>
     </div>
 

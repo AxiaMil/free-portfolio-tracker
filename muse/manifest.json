@@ -1,6 +1,6 @@
 {
   "name": "Portfolio Tracker",
-  "about": "Everything a Meta Muse space needs to run Portfolio Tracker. The space is built by copying these files as listed; nothing is designed or rewritten. Always read this file from the main branch: it describes the current version, and its steps work whatever version a space has now.",
+  "about": "Everything a Meta Muse space needs to run Portfolio Tracker. The app is complete: the space is built only by copying these files as listed and connecting them. Nothing is designed, rewritten or added. Always read this file from the main branch: it describes the current version, and its steps work whatever version a space has now.",
   "repository": "https://github.com/AxiaMil/free-portfolio-tracker",
   "branch": "main",
   "howToUse": {
@@ -10,24 +10,28 @@
       "Copy each file in files to the place it gives, unchanged. Create each file in spaceOwnFiles from its template.",
       "Connect only the imports that starterParts names to this space's starter, and remove what starterParts.remove names.",
       "Create the tables in storage.tables as server/src/schema.ts defines them.",
-      "Set up exactly the server actions in actions, the network access in network (the user approves it) and the scheduled job in cron. Follow time.",
-      "Run refreshMarketCache once. Set up dividend payment dates as payouts.forMuse says: the built-in connectors need nothing, and you write this space's own connector for the user's holdings they don't cover. Then go through checks.newSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
+      "Set up exactly the server actions in actions, the network access in network and the scheduled job in cron. Ask the user to approve them, saying what each is for (approvals). Follow time.",
+      "Build the space. The files pass a strict TypeScript check as shipped: follow typescript if your build reports an error.",
+      "Run refreshMarketCache once. Dividend payment dates need nothing more (payouts.builtIn): don't do payouts.forMuse now, only when the user asks for it later.",
+      "Go through checks.newSpace and checks.always yourself, in the running space, then tell the user what finish says."
     ],
     "existingSpace": [
       "This updates or repairs a space made from any earlier version of this file, including one that was changed since it was made.",
       "Fetch every file named here fresh from the main branch of the repository. Never reuse a copy from an earlier conversation, an earlier version or the space itself.",
       "Keep the saved data: every row of every table in storage.tables, as it is. Never drop, clear, reset, re-create, migrate or reseed a table, and add no sample or test data. The app reads saved data from any earlier version and fills in what is new itself. If server/src/schema.ts has a table or column the space lacks, add it without touching existing rows.",
       "Replace the app file and every file in files with the fresh copies, exactly as for a new space, including the app.bytes check. Never replace the files in spaceOwnFiles: they are this space's own (create one from its template only if it is missing).",
-      "Remove everything in the space's client and server code that this file doesn't list, except the starter's own modules that starterParts names and the files in spaceOwnFiles. That includes leftovers from earlier versions (such as embedded copies of the app/ folder, blob URLs, an import map, a boot ladder, a fetch cache, or a patched or second copy of the app) and anything added around the app (a header, title bar, avatar, navigation labels, banner, tips, notes or restyling).",
-      "Make the server actions, network access and scheduled jobs exactly actions, network and cron: add what is missing, update what differs and remove what isn't listed. Follow time.",
-      "Run refreshMarketCache once. Set up dividend payment dates as payouts.forMuse says: the built-in connectors need nothing, and you write this space's own connector for the user's holdings they don't cover. Then go through checks.existingSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
+      "Remove everything in the space's client and server code that this file doesn't list, except the starter's own modules that starterParts names and the files in spaceOwnFiles. That includes leftovers from earlier versions (such as embedded copies of the app/ folder, blob URLs, an import map, a boot ladder, a fetch cache, a patched or second copy of the app, or type-only edits made to an earlier copy of a file) and anything added around the app (a header, title bar, avatar, navigation labels, banner, tips, notes or restyling).",
+      "Make the server actions, network access and scheduled jobs exactly actions, network and cron: add what is missing, update what differs and remove what isn't listed. Ask the user to approve any new network access, saying what it is for (approvals). Follow time.",
+      "Build the space. The files pass a strict TypeScript check as shipped: follow typescript if your build reports an error.",
+      "Run refreshMarketCache once. Dividend payment dates need nothing more (payouts.builtIn): don't do payouts.forMuse now, only when the user asks for it later.",
+      "Go through checks.existingSpace and checks.always yourself, in the running space, then tell the user what finish says."
     ]
   },
   "app": {
     "source": "app/portfolio-tracker.js",
     "copyTo": "client/src/portfolio-tracker.js",
-    "bytes": 2194329,
-    "sha256": "ec1610fb742d83710fb5d597bc318c7e2e39daecfe7bb95d1434c04107f919e7",
+    "bytes": 2196588,
+    "sha256": "6f97629ee24f85343bac1a258e4bcdd7834df2cb8ae2dbc952081e0b50752690",
     "rules": [
       "byte for byte: never edit, rebuild, minify, split, unpack, restyle, translate or port it. bytes and sha256 above are the file's own; npm run build:app writes them",
       "it is the whole front end, full screen; it mounts itself into #app and loads no other file",
@@ -51,7 +55,7 @@
   "spaceOwnFiles": {
     "server/src/custom-payouts.ts": {
       "template": "muse/server/src/custom-payouts.ts",
-      "rule": "this space's own dividend-date connector, written for the user's holdings that no built-in connector covers (payouts.forMuse). Create it from the template when the space doesn't have it; never replace, reset or remove it on an update"
+      "rule": "this space's own, optional dividend-date connector (payouts.forMuse). Create it from the template when the space doesn't have it, unchanged; never replace, reset or remove it on an update"
     }
   },
   "starterParts": {
@@ -59,6 +63,7 @@
     "server/src/db.ts": "the starter's own Drizzle database; server/src/actions.ts imports db from it",
     "remove": "the starter's own App component, styles and #root: the page holds only #app"
   },
+  "typescript": "Every file here, and the custom-payouts.ts template, passes TypeScript's strict mode with noUncheckedIndexedAccess and the rest of a Bun project's default settings, as shipped (the repository's npm test checks this). If your build reports a type error in one of them, your copy is old: fetch it fresh from the main branch. If it still fails, change nothing about how the code works: make the smallest type-only change that builds (such as a non-null assertion), and tell the user the file, line and error, so it is fixed in the repository. The next update replaces that file again.",
   "storage": {
     "tables": {
       "app_state": { "key": "TEXT PRIMARY KEY", "value": "TEXT NOT NULL", "updated_at": "INTEGER (epoch ms)" },
@@ -69,7 +74,7 @@
       "market_cache/chart:<SYMBOL>": "daily history, dividends, splits",
       "market_cache/spark:<SYM,SYM,...>": "latest quotes, up to 20 symbols",
       "market_cache/search:<SYMBOL>": "company profile",
-      "market_cache/payouts:<SYMBOL>": "each dividend's ex-date and payment date, from the exchange or the space's own connector"
+      "market_cache/payouts:<SYMBOL>": "each dividend's ex-date and payment date, from a built-in connector or the space's own"
     }
   },
   "actions": {
@@ -81,28 +86,40 @@
     "refreshMarketCache": { "input": {}, "returns": "{ ok, symbols, updated, failed, payouts, at }" },
     "getPayouts": { "input": "{ asks: [{ symbol, exchange?, currency?, name? }], force? }", "returns": "{ ok, payouts: { [symbol]: { records, source, checkedAt, error? } } }", "note": "dividend payment dates from the built-in connectors (server/src/payouts.ts), then the space's own (server/src/custom-payouts.ts); the app calls it to check now" }
   },
-  "network": ["query1.finance.yahoo.com", "query2.finance.yahoo.com", "api.sgx.com", "api.nasdaq.com", "asx.api.markitdigital.com"],
+  "network": ["query1.finance.yahoo.com", "query2.finance.yahoo.com", "api.sgx.com", "api.nasdaq.com", "asx.api.markitdigital.com", "fc.yahoo.com"],
   "networkOwn": "besides network: the hosts in CUSTOM_HOSTS of server/src/custom-payouts.ts, each approved by the user when the connector is written",
+  "approvals": {
+    "query1.finance.yahoo.com": "prices, dividends, splits and exchange rates (only ticker symbols are sent)",
+    "query2.finance.yahoo.com": "ticker search and company details",
+    "api.sgx.com": "payment dates of Singapore (.SI) dividends",
+    "api.nasdaq.com": "payment dates of Nasdaq-listed dividends",
+    "asx.api.markitdigital.com": "payment dates of Australian (.AX) dividends",
+    "fc.yahoo.com": "an anonymous Yahoo session for the payment dates of other US dividends, NYSE included (nothing of the user's is sent)",
+    "refreshMarketCache every 10 minutes": "keeps prices and dividend dates fresh while the app is closed, so it opens at once"
+  },
   "cron": [{ "id": "portfolio-tracker-market-refresh-10m", "action": "refreshMarketCache", "every": "10m" }],
   "payouts": {
-    "what": "Each dividend's payment date, so the app adds a dividend to cash on the day the company pays it, and counts it as \"to be paid\" from its ex-date until then. Yahoo's free data has only the ex-date.",
+    "what": "Each dividend's payment date, so the app adds a dividend to cash on the day the company pays it, and counts it as \"to be paid\" from its ex-date until then. Where no payment date is published, the app estimates it from the company's usual wait after the ex-date and shows it with a ~; a dividend never stays unpaid for ever.",
     "builtIn": {
       "sgx": "Singapore (.SI): shares, REITs and ETFs, full history, from SGX's own corporate actions",
       "nasdaq": "US shares and ETFs listed on Nasdaq, full history, from Nasdaq",
+      "yahoo": "other US shares and ETFs, NYSE included: each latest dividend, kept as they build up, from Yahoo Finance",
       "asx": "Australia (.AX): each latest dividend, kept as they build up, from the ASX",
-      "setup": "none: no sign-up, API key, login or cookies. refreshMarketCache looks each dividend-paying holding up once a day"
+      "setup": "none: no sign-up, API key or login. refreshMarketCache looks each dividend-paying holding up once a day. Other listings (such as Hong Kong or London) get estimated dates, which is complete as it is"
     },
     "forMuse": [
-      "After refreshMarketCache has run, read the payouts:<SYMBOL> rows in market_cache. A row whose source is null is a holding no built-in connector covers (such as a US share on NYSE or NYSE Arca, or a Hong Kong, London, Tokyo or Bursa listing). The app lists the same holdings under Settings → Dividend dates as \"Ask your Muse\".",
-      "For exactly those holdings, write customPayouts in server/src/custom-payouts.ts, following the rules at the top of that file. Read the dividend announcements where they are published for free: the exchange's own announcements first (such as HKEXnews for .HK or the London Stock Exchange's RNS for .L), otherwise the company's investor-relations dividend page or the dividend announcement that comes with each quarterly or half-yearly result. Return each dividend's ex-date and payment date as the company published them.",
-      "No sign-up, API key, login or cookies, and never estimate a date: a dividend whose payment date isn't published yet gets payDate null.",
+      "Optional, and only when the user asks for it (Settings → Dividend Dates gives them the request to send you); never as part of setting up or updating the space.",
+      "It is for holdings whose payment dates are estimated because no built-in connector covers them (such as a Hong Kong, London, Tokyo or Bursa listing). getPayouts returns source null for them.",
+      "Find a free, public source of each one's dividend announcements that a server can read with no sign-up, API key or login: the exchange's own announcements first (such as HKEXnews for .HK or the London Stock Exchange's RNS for .L), otherwise the company's investor-relations dividend page.",
+      "Write customPayouts in server/src/custom-payouts.ts for exactly those holdings, following the rules at the top of that file. Return each dividend's ex-date and payment date as published, and never estimate a date yourself: payDate null when it isn't published (the app estimates it).",
       "Put every host it reads in CUSTOM_HOSTS and ask the user to approve them as network access.",
-      "Call getPayouts with force: true for those holdings and check that each one now has records with payment dates. Tell the user in plain words where each holding's dates now come from, and name any you could not connect: they can type those dates on the Dividends page.",
-      "Later, when the user asks you to connect dividend dates for some holdings (the app's \"Ask your Muse\" gives them the sentence to send), do the same for the holdings named, adding to customPayouts without changing what already works."
+      "Call getPayouts with force: true for those holdings and check that each one now has records with payment dates.",
+      "If a source refuses a server (blocked, a login or a cookie challenge), try at most one other for that holding, then stop: tell the user its dates stay estimated and that they can type exact ones on the Dividends page.",
+      "Tell the user in plain words where each holding's dates now come from."
     ]
   },
   "time": "the app shows every time in the user's local time zone, taken from their device. Never set, force or convert a time zone anywhere in the space (never force UTC)",
-  "notNeeded": ["a database beyond the two tables", "login", "API keys or cookies", "any other network access (besides networkOwn)"],
+  "notNeeded": ["a database beyond the two tables", "login", "API keys, sign-ups or the user's own cookies", "any other network access (besides networkOwn)", "writing a dividend-date connector while setting up or updating"],
   "checks": {
     "newSpace": [
       "Home shows 0.00 with an empty chart",
@@ -110,7 +127,7 @@
       "reloading the space keeps the transaction"
     ],
     "existingSpace": [
-      "Home shows the saved portfolio with the same holdings as before the update; nothing was added to it"
+      "Home shows the saved portfolio with the same holdings and the same number of transactions as before the update; nothing was added to it"
     ],
     "always": [
       "the + button opens \"Manage Transaction\"",
@@ -118,7 +135,15 @@
       "Home's \"Last Updated\" line shows the user's local time and time zone (such as GMT+8 in Singapore), never forced to UTC",
       "Settings → Data & Backup → Where it is saved says \"Muse space storage\"",
       "after refreshMarketCache has run once, a fresh device opens Home on the saved prices within a couple of seconds",
-      "Settings → Dividend dates lists each dividend-paying holding with where its payment dates come from; none says \"Ask your Muse\" once payouts.forMuse is done, except those you told the user you couldn't connect"
+      "Settings → Dividend Dates lists each dividend-paying holding with where its payment dates come from (SGX, Nasdaq, Yahoo Finance or ASX), or that they are estimated",
+      "on the Dividends page, each dividend sits on its own payment date: one whose date isn't published shows an estimated date with a ~, and none are piled up as \"to be paid\" on today"
     ]
-  }
+  },
+  "finish": [
+    "Do every check yourself and report each one as passed, failed (with what you saw) or not possible here (and why). Don't leave a check for later.",
+    "Tell the user: the space is ready, the commit you copied from and the size of the app file you copied. For an update, also that their data is unchanged (the number of transactions and holdings, before and after).",
+    "Name anything that didn't go as this file says (a failed step, a type-only change and why, a check that failed), so it can be fixed in the repository. Change nothing else to work around it.",
+    "Then tell the user how to start: + adds a transaction, or Upload Files takes a CSV (Date, Action, Ticker, Shares, Price, Currency, Commission). Settings → Portfolio Settings sets the base currency and the dividend withholding tax. Settings → Dividend Dates shows where payment dates come from.",
+    "Ask nothing else of the user: the space needs no keys or accounts."
+  ]
 }

@@ -8,7 +8,7 @@ The app reaches outside the browser in only three places. A host platform can ta
 |---|---|---|
 | **Saving your data** | This browser's `localStorage`, falling back to IndexedDB | [`src/platform/storage.ts`](../src/platform/storage.ts) |
 | **Market data** (Yahoo Finance) | The `./yahoo/…` route that `npm run dev` / `npm start` forwards | [`src/market/client.ts`](../src/market/client.ts) |
-| **Dividend payment dates** (SGX, Nasdaq, ASX) | The `./payouts` route that `npm run dev` / `npm start` serves | [`muse/server/src/payouts.ts`](../muse/server/src/payouts.ts) |
+| **Dividend payment dates** (SGX, Nasdaq, Yahoo, ASX) | The `./payouts` route that `npm run dev` / `npm start` serves | [`muse/server/src/payouts.ts`](../muse/server/src/payouts.ts) |
 
 All are switched through one optional object, `window.portfolioHost`. Define it in any of these places:
 
@@ -69,7 +69,7 @@ Every member is optional:
   - The app parses each entry exactly like a live answer and keeps it wherever it is newer than the device's own copy. It never waits for the cache longer than 2 s.
 - **`saveMarketCache(entries)`** receives the same kind of entries: fresh quotes and profiles the open app fetched. They arrive at most every 15 s, 60 per call, and right away when the page is hidden. Saving them is best effort; errors are ignored.
 
-- **`fetchPayouts(asks, { force })`** looks up dividend payment dates. `asks` is `[{ symbol, exchange, currency, name }]`, one per holding that pays dividends (`exchange` is Yahoo's exchange code, such as `SES` or `NMS`). Return `{ payouts: { [symbol]: { records, source, checkedAt, error? } } }`, where each record is `{ exDate, payDate, recordDate?, amount?, currency?, source }` with `yyyy-mm-dd` dates and `payDate: null` when the company hasn't published it. `fetchPayouts` in [`muse/server/src/payouts.ts`](../muse/server/src/payouts.ts) does the look-up for one ask and never throws, so a server can call it as it is. The app asks when its copy is more than 12 hours old; `force` is set when the user taps **Check now**. Without `fetchPayouts`, the app uses the `./payouts` route if there is one, and otherwise shows each dividend's payment date as not published, so the user can type it.
+- **`fetchPayouts(asks, { force })`** looks up dividend payment dates. `asks` is `[{ symbol, exchange, currency, name }]`, one per holding that pays dividends (`exchange` is Yahoo's exchange code, such as `SES` or `NMS`). Return `{ payouts: { [symbol]: { records, source, checkedAt, error? } } }`, where each record is `{ exDate, payDate, recordDate?, amount?, currency?, source }` with `yyyy-mm-dd` dates and `payDate: null` when the company hasn't published it. `fetchPayouts` in [`muse/server/src/payouts.ts`](../muse/server/src/payouts.ts) does the look-up for one ask and never throws, so a server can call it as it is. The app asks when its copy is more than 12 hours old; `force` is set when the user taps **Check now**. Without `fetchPayouts`, the app uses the `./payouts` route if there is one, and otherwise estimates each payment date from the usual wait after the ex-date (shown with a ~, and the user can type the exact one).
 
 If the saved state can't be read (`loadState` throws, or takes more than 30 s), the app shows that with a **Try again** button. It never starts empty over existing data.
 
@@ -92,6 +92,7 @@ Payment-date look-ups (from the server, through `fetchPayouts` or `./payouts`, n
 | SGX | `https://api.sgx.com/marketmetadata/v2?stock-code={code}`, then `https://api.sgx.com/corporateactions/v1.0?…&ibmcode={id}&cat=DIVIDEND…` |
 | Nasdaq | `https://api.nasdaq.com/api/quote/{symbol}/dividends?assetclass=stocks` (or `etf`) |
 | ASX | `https://asx.api.markitdigital.com/asx-research/1.0/companies/{code}/key-statistics` |
+| Yahoo (US listings) | `https://fc.yahoo.com/` once for an anonymous session cookie, `https://query1.finance.yahoo.com/v1/test/getcrumb` for its token, then `https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbol}&fields=exDividendDate,dividendDate…` |
 
 FX rates are charts too (for example `USDSGD=X`). A server-side Yahoo fetch should allow these two hosts and nothing else:
 
@@ -125,7 +126,7 @@ A Muse space can run a front end plus server actions, with its own storage and s
 | `loadState` / `saveState` | `getPortfolio` / `savePortfolio`: one JSON document under `portfolio` in the `app_state` table. On a phone, the first call of a session can fail once while the phone's bridge starts, so [`muse/client/src/host.ts`](../muse/client/src/host.ts) retries a failed load after 0.7, 1.5, 3 and 5 s, then throws |
 | `fetchJson` | `yahooGet`: allow-listed to `query1.finance.yahoo.com` and `query2.finance.yahoo.com`, which Muse's Sentinel asks you to approve |
 | `loadMarketCache` / `saveMarketCache` | `getSnapshot` / `saveSnapshotEntries` on the `market_cache` table |
-| `fetchPayouts` | `getPayouts`: the SGX, Nasdaq and ASX connectors, plus the space's own connector that Muse writes for holdings they don't cover ([`muse/README.md`](../muse/README.md#dividend-payment-dates-set-up-by-muse)) |
+| `fetchPayouts` | `getPayouts`: the SGX, Nasdaq, Yahoo and ASX connectors, plus the space's own, optional connector that Muse writes when the user asks ([`muse/README.md`](../muse/README.md#dividend-payment-dates)) |
 | A snapshot fresh while the app is closed | `refreshMarketCache` every 10 minutes ([`muse/space.json`](../muse/space.json)), with payment dates once a day |
 
 The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on. `npm test` also covers the bridge's retried load and the style repair below. It checks that `app/portfolio-tracker.js` builds no code from strings, which Muse's publishing check refuses, and that the manifest matches the code and the committed app file.

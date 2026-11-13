@@ -1,0 +1,31 @@
+{
+  // The Muse space's files under a Bun project's default TypeScript settings (`bun init`), which a Muse space's
+  // runtime checks them with. tests/muse-typecheck.test.ts runs it; the starter's own modules are stubbed in stubs.d.ts.
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "allowJs": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "types": []
+  },
+  "files": [
+    "stubs.d.ts",
+    "../../muse/server/src/actions.ts",
+    "../../muse/server/src/market.ts",
+    "../../muse/server/src/payouts.ts",
+    "../../muse/server/src/custom-payouts.ts",
+    "../../muse/server/src/schema.ts",
+    "../../muse/client/src/host.ts",
+    "../../muse/client/src/main.ts"
+  ]
+}

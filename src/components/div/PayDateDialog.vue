@@ -22,7 +22,8 @@ const from = computed(() => {
   if (!e) return '';
   if (typed.value) return 'You typed this date.';
   if (e.payKnown) return `Published by the company, from ${sourceName(e.paySource)}.`;
-  return 'The company’s payment date isn’t published here yet. Until it is, this dividend counts in your value as “to be paid”, and not in your cash.';
+  const days = Math.round((Date.parse(e.payDate) - Date.parse(e.exDate)) / 86_400_000);
+  return `No payment date is published here for this dividend, so it is estimated: ${e.payDate}, ${days} days after the ex-dividend date (the company’s usual wait, or a typical one when that isn’t known). Type the actual date if you know it.`;
 });
 
 function save() {

@@ -353,28 +353,33 @@ test('dividend payment date: value from the ex-date, cash only on the published 
   balanced(r);
 });
 
-test('dividend payment date: still to be paid when the date is ahead or not published', () => {
+test('dividend payment date: to be paid while its date, published or estimated, is ahead', () => {
   const c = chart('DIV', 'USD', () => 50, { dividends: [['2026-05-04', 1], ['2026-06-01', 2]] });
   const p = portfolio('USD', [tx('2026-01-02', 'Deposit', 'CASH', 5000, 1), tx('2026-01-02', 'Buy', 'DIV', 100, 50)], { autoDividend: true });
-  // May's is paid after today; June's has no payment date published yet
+  // May's is paid after today; June's has no payment date published, so it takes the company's usual wait (67 days)
   const { r } = run(p, [c], { payouts: { DIV: paidOn([['2026-05-04', '2026-07-10'], ['2026-06-01', null]]) } });
   near(r.cash, 0);
   near(r.toBePaid, 300);
   near(r.value, 5000 + 300);
   near(r.pnl.dividends, 300); // income from the ex-date
-  const st = Object.fromEntries(r.dividends.filter((d) => d.symbol === 'DIV').map((d) => [d.exDate, [d.status, d.payKnown]]));
-  assert.deepEqual(st, { '2026-05-04': ['toBePaid', true], '2026-06-01': ['toBePaid', false] });
+  const st = Object.fromEntries(r.dividends.filter((d) => d.symbol === 'DIV').map((d) => [d.exDate, [d.status, d.payKnown, d.payDate]]));
+  assert.deepEqual(st, { '2026-05-04': ['toBePaid', true, '2026-07-10'], '2026-06-01': ['toBePaid', false, '2026-08-07'] });
   assert.ok(r.toBePaidRow);
   near(r.toBePaidRow!.allocation + r.cashRow.allocation + r.holdings.reduce((s, h) => s + h.allocation, 0), 1);
   balanced(r);
 });
 
-test('dividend payment date: a date you type wins; with none, no source means to be paid, never a guess', () => {
+test('dividend payment date: a date you type wins; with no source the date is estimated, and then it is paid', () => {
   const c = chart('DIV', 'USD', () => 50, { dividends: [['2026-03-02', 1]] });
   const base = [tx('2026-01-02', 'Deposit', 'CASH', 5000, 1), tx('2026-01-02', 'Buy', 'DIV', 100, 50)];
+  // no source at all: a US listing's typical 21 days, so paid on 2026-03-23, marked as an estimate
   const none = run(portfolio('USD', base, { autoDividend: true }), [c]).r;
-  near(none.cash, 0);
-  near(none.toBePaid, 100);
+  near(none.cash, 100);
+  near(none.toBePaid, 0);
+  const est = none.dividends.find((d) => d.symbol === 'DIV')!;
+  assert.deepEqual([est.status, est.payDate, est.payKnown, est.paySource], ['received', '2026-03-23', false, null]);
+  near(none.series[none.dateIndex.get('2026-03-20')!].toBePaid, 100);
+  near(none.series[none.dateIndex.get('2026-03-23')!].cash, 100);
   const typed = run(portfolio('USD', base, { autoDividend: true, payDates: { 'DIV|2026-03-02': '2026-03-25' } }), [c], { payouts: { DIV: paidOn([['2026-03-02', '2026-03-20']]) } }).r;
   near(typed.cash, 100);
   near(typed.toBePaid, 0);
@@ -386,31 +391,49 @@ test('dividend payment date: a date you type wins; with none, no source means to
   balanced(typed);
 });
 
+test('dividend payment date: old dividends with no source are spread over their own dates and paid, never left due today', () => {
+  // four quarterly dividends, none with a published date: each gets its own estimated date, and all are paid by today
+  const exs = ['2025-08-01', '2025-11-03', '2026-02-02', '2026-05-01'];
+  const c = chart('QTR', 'USD', () => 50, { dividends: exs.map((d) => [d, 0.5] as [string, number]) });
+  const p = portfolio('USD', [tx('2025-06-02', 'Deposit', 'CASH', 5000, 1), tx('2025-06-02', 'Buy', 'QTR', 100, 50)], { autoDividend: true });
+  const { r } = run(p, [c]);
+  const evs = r.dividends.filter((d) => d.symbol === 'QTR' && d.exDate <= TODAY);
+  assert.deepEqual(evs.map((d) => [d.payDate, d.status]), [['2025-08-22', 'received'], ['2025-11-24', 'received'], ['2026-02-23', 'received'], ['2026-05-22', 'received']]);
+  near(r.toBePaid, 0);
+  near(r.cash, 200);
+  // outside the US, the typical wait is 30 days; the company's own published wait beats both
+  const hk = chart('ABC.HK', 'HKD', () => 50, { dividends: [['2026-03-02', 1]] });
+  const hkr = run(portfolio('HKD', [tx('2026-01-02', 'Buy', 'ABC.HK', 100, 50)], { autoDividend: true }), [hk]).r;
+  assert.equal(hkr.dividends.find((d) => d.symbol === 'ABC.HK')!.payDate, '2026-04-01');
+  balanced(r);
+});
+
 test('dividend payment date: a connector record a day off the ex-date still matches', () => {
   const c = chart('DIV', 'USD', () => 50, { dividends: [['2026-03-02', 1]] });
   const p = portfolio('USD', [tx('2026-01-02', 'Deposit', 'CASH', 5000, 1), tx('2026-01-02', 'Buy', 'DIV', 100, 50)], { autoDividend: true });
   const { r } = run(p, [c], { payouts: { DIV: paidOn([['2026-03-03', '2026-03-20']]) } });
-  near(r.cash, 100);
+  const hit = r.dividends.find((d) => d.symbol === 'DIV')!;
+  assert.deepEqual([hit.payDate, hit.payKnown], ['2026-03-20', true]);
+  // a week away is another dividend: this one's date is estimated, from that one's 11-day wait
   const far = run(p, [c], { payouts: { DIV: paidOn([['2026-03-09', '2026-03-20']]) } }).r;
-  near(far.cash, 0); // a week away is another dividend
+  const miss = far.dividends.find((d) => d.symbol === 'DIV')!;
+  assert.deepEqual([miss.payDate, miss.payKnown], ['2026-03-13', false]);
 });
 
-test('dividend payment date: spending a dividend whose date isn\'t published adds no deposit you didn\'t make', () => {
+test('dividend payment date: spending a dividend before its payment date adds no deposit you didn\'t make', () => {
   const c = chart('DIV', 'USD', () => 50, { dividends: [['2026-03-02', 1]] });
-  // no deposits recorded: the buy is paid for by an automatic deposit; later $100 of dividend buys 2 more shares
+  // no deposits recorded: the buy is paid for by an automatic deposit; the $100 dividend, paid on 04-20, buys 2 more shares on 04-01
   const txns = [tx('2026-01-02', 'Buy', 'DIV', 100, 50), tx('2026-04-01', 'Buy', 'DIV', 2, 50)];
-  const { r } = run(portfolio('USD', txns, { autoDividend: true }), [c]);
+  const { r } = run(portfolio('USD', txns, { autoDividend: true }), [c], { payouts: { DIV: paidOn([['2026-03-02', '2026-04-20']]) } });
   near(r.netDeposits, 5000);
-  near(r.toBePaid, 100);
-  near(r.cash, -100); // spent before its payment is recorded
+  const mid = r.series[r.dateIndex.get('2026-04-10')!];
+  near(mid.cash, -100); // spent before it was paid
+  near(mid.toBePaid, 100);
+  near(mid.netDeposits, 5000);
+  near(r.cash, 0); // paid on 04-20
+  near(r.toBePaid, 0);
   near(r.value, 102 * 50);
   balanced(r);
-  // once its payment date is known, cash is back to 0
-  const paid = run(portfolio('USD', txns, { autoDividend: true }), [c], { payouts: { DIV: paidOn([['2026-03-02', '2026-03-20']]) } }).r;
-  near(paid.netDeposits, 5000);
-  near(paid.cash, 0);
-  near(paid.toBePaid, 0);
-  balanced(paid);
 });
 
 test('announced dividends from a connector show as confirmed with their own dates', () => {

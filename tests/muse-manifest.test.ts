@@ -97,7 +97,10 @@ test('its actions, network access, tables and job match the code', () => {
   assert.deepEqual(Object.keys(manifest.actions).sort(), exported.sort());
   assert.deepEqual(manifest.actions.yahooGet.allow, ALLOWED_PREFIXES);
   // Yahoo for prices, and the hosts of the built-in dividend-date connectors
-  assert.deepEqual(manifest.network, [...ALLOWED_PREFIXES.map((u) => new URL(u).hostname), ...PAYOUT_HOSTS]);
+  assert.deepEqual(manifest.network, [...new Set([...ALLOWED_PREFIXES.map((u) => new URL(u).hostname), ...PAYOUT_HOSTS])]);
+  // the user is told what each address and the job are for
+  for (const host of manifest.network) assert.ok(manifest.approvals?.[host], `approvals explains ${host}`);
+  assert.ok(Object.keys(manifest.approvals).some((k) => k.startsWith('refreshMarketCache')), 'approvals explains the job');
 
   const tables = Object.fromEntries([...read('muse/server/src/schema.ts').matchAll(/sqliteTable\('(\w+)', \{([\s\S]*?)\n\}\)/g)]
     .map(([, name, body]) => [name, [...body.matchAll(/(?:text|integer)\('(\w+)'\)/g)].map((m) => m[1])]));
@@ -119,7 +122,11 @@ test('its steps cover a new space and any existing one, and every key they name 
     }
     assert.ok(Array.isArray(manifest.checks[kind]) && manifest.checks[kind].length, `checks.${kind}`);
   }
-  for (const key of ['files', 'actions', 'network', 'cron', 'time', 'checks.always']) assert.notEqual(at(key), undefined, key);
+  for (const key of ['files', 'actions', 'network', 'approvals', 'cron', 'time', 'typescript', 'finish', 'checks.always']) assert.notEqual(at(key), undefined, key);
+  for (const kind of ['newSpace', 'existingSpace']) {
+    const all = manifest.howToUse[kind].join(' ');
+    for (const word of ['approvals', 'typescript', 'finish']) assert.match(all, new RegExp(`\\b${word}\\b`), `${kind} points to ${word}`);
+  }
   assert.ok('refreshMarketCache' in manifest.actions, 'the steps run refreshMarketCache');
   assert.match(manifest.howToUse.existingSpace.join(' '), /Keep the saved data/);
 });
@@ -135,7 +142,10 @@ test('dividend payment dates: the space\'s own connector is kept, and Muse is to
   assert.match(manifest.payouts.forMuse.join(' '), /CUSTOM_HOSTS/);
   assert.match(manifest.payouts.forMuse.join(' '), /never estimate/);
   // nothing for the user to set up
-  assert.ok(manifest.notNeeded.includes('API keys or cookies'));
+  assert.ok(manifest.notNeeded.some((x: string) => /API keys/.test(x)));
+  // exact dates for other listings are optional and only on request: never part of setting up or updating
+  assert.match(manifest.payouts.forMuse[0], /only when the user asks/);
+  for (const kind of ['newSpace', 'existingSpace']) assert.match(manifest.howToUse[kind].join(' '), /don't do payouts\.forMuse now/, kind);
   assert.doesNotMatch(read('muse/server/src/payouts.ts'), /apikey|api_key|token=/i);
   assert.match(read('muse/server/src/actions.ts'), /from '\.\/custom-payouts'/);
 });

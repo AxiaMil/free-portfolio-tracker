@@ -32,7 +32,7 @@ const store: market.SnapshotStore = {
   async readRows(since) {
     const q = db.select().from(marketCache);
     const rows = await (since ? q.where(gt(marketCache.fetchedAt, since)) : q);
-    return rows.map((r) => ({ key: r.symbol, data: r.data, fetchedAt: r.fetchedAt }));
+    return rows.map((r: typeof marketCache.$inferSelect) => ({ key: r.symbol, data: r.data, fetchedAt: r.fetchedAt }));
   },
   async writeRows(rows) {
     for (const r of rows) {

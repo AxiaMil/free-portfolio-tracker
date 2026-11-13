@@ -18,10 +18,7 @@ export interface DivEvent extends DividendEvent {
   key: string;
   /** not in your cash yet: to be paid, confirmed or estimated */
   upcoming: boolean;
-  /**
-   * where it sits in time on this page: its payment date, or, for one to be paid whose payment date isn't published,
-   * today (it is due, on a day not known yet)
-   */
+  /** where it sits in time on this page: its payment date, published or (payKnown false) estimated */
   when: string;
   label: DivLabel;
   /** dividend per share converted to the base currency */
@@ -69,7 +66,7 @@ export function buildDividendEvents(r: EngineResult, m: MarketView): DivEvent[] 
     const netShare = grossBase ? amountBase / grossBase : 1;
     const perShare = d.perShare * g * netShare;
     const label: DivLabel = d.status === 'received' ? 'Paid' : d.status === 'toBePaid' ? 'To be paid' : d.status === 'confirmed' ? 'Confirmed' : 'Estimated';
-    const when = d.status === 'toBePaid' && !d.payKnown ? (r.today > d.exDate ? r.today : d.exDate) : d.payDate;
+    const when = d.payDate;
     return {
       ...d,
       perShare,
@@ -247,8 +244,9 @@ export interface PositionRow {
   receivedTTM: number;
   receivedAll: number;
   nextEx: string | null;
-  /** the next payment date, null when it isn't published yet */
+  /** the next payment date, published or estimated (nextPayKnown false) */
   nextPay: string | null;
+  nextPayKnown: boolean;
   nextAmount: number | null;
 }
 
@@ -276,7 +274,8 @@ export function positionRows(events: DivEvent[], r: EngineResult): PositionRow[]
       receivedTTM: sumAmt(recv),
       receivedAll: sumAmt(events.filter((e) => e.symbol === h.symbol && !e.upcoming)),
       nextEx: next?.exDate ?? null,
-      nextPay: next?.payKnown ? next.payDate : null,
+      nextPay: next?.payDate ?? null,
+      nextPayKnown: !!next?.payKnown,
       nextAmount: next?.amountBase ?? null,
     });
   }

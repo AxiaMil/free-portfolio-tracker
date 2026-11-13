@@ -12,7 +12,7 @@ export const appState = sqliteTable('app_state', {
 });
 
 export const marketCache = sqliteTable('market_cache', {
-  /** the snapshot key: chart:<SYMBOL>, spark:<SYM,SYM,...> or search:<SYMBOL> */
+  /** the snapshot key: chart:<SYMBOL>, spark:<SYM,SYM,...>, search:<SYMBOL> or payouts:<SYMBOL> */
   symbol: text('symbol').primaryKey(),
   /** the Yahoo response JSON, as a string */
   data: text('data').notNull(),
