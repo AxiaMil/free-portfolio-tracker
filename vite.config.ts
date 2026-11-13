@@ -1,6 +1,10 @@
 import { defineConfig, type Plugin, type ProxyOptions } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import vuetify from 'vite-plugin-vuetify';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // The app builds to plain static files (dist/) with relative paths, so any static host can serve it.
 // Browsers can't call Yahoo Finance directly (it sends no CORS headers), so `npm run dev` and `npm start`
@@ -67,12 +71,24 @@ function oneFile(): Plugin {
         const js = bundle[SINGLE_JS];
         if (!js || js.type !== 'chunk') this.error(`one-file build: ${SINGLE_JS} missing`);
         const style = `(function(){var s=document.createElement("style");s.setAttribute("data-app","portfolio-tracker");s.textContent=${JSON.stringify(css.join('\n'))};(document.head||document.documentElement).appendChild(s)})();\n`;
-        js.code = `/*! Portfolio Tracker, one-file build. MIT licence. https://github.com/AxiaMil/portfolio-tracker */\n${style}${js.code}`;
+        js.code = `/*! Portfolio Tracker, one-file build. MIT licence. https://github.com/AxiaMil/free-portfolio-tracker */\n${style}${js.code}`;
         // Meta Muse refuses to publish a script that builds code from a string, so the file Muse copies must have none
         const evalLike = js.code.match(CODE_FROM_STRING);
         if (evalLike) this.error(`one-file build contains code built from a string (${evalLike[0]}), which Meta Muse refuses`);
         this.emitFile({ type: 'asset', fileName: 'portfolio-tracker.html', source: SINGLE_HTML });
       },
+    },
+    // muse/manifest.json gives Muse the app file's exact size and hash, to check its copy against
+    writeBundle(options) {
+      const file = readFileSync(join(options.dir ?? 'app', SINGLE_JS));
+      const manifestPath = fileURLToPath(new URL('./muse/manifest.json', import.meta.url));
+      const before = readFileSync(manifestPath, 'utf8');
+      const sha256 = createHash('sha256').update(file).digest('hex');
+      const after = before
+        .replace(/("bytes":\s*)\d+/, `$1${file.length}`)
+        .replace(/("sha256":\s*)"[0-9a-f]*"/, `$1"${sha256}"`);
+      if (!after.includes(`"bytes": ${file.length}`) || !after.includes(`"sha256": "${sha256}"`)) this.error('muse/manifest.json: app.bytes or app.sha256 not found');
+      if (after !== before) writeFileSync(manifestPath, after);
     },
   };
 }

@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AxiaMil/portfolio-tracker.git"
+    "url": "https://github.com/AxiaMil/free-portfolio-tracker.git"
   },
   "engines": {
     "node": ">=20"

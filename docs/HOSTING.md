@@ -103,7 +103,7 @@ When everything it needs is cached on the device or in the host's market cache, 
 
 ## Running on Meta Muse
 
-A Muse space can run a front end plus server actions, with its own storage and scheduled jobs. It cannot run a Node server, a long-running process or files on disk. The finished space is in [`muse/`](../muse): Muse copies it as [`muse/manifest.json`](../muse/manifest.json) lists it, and [`muse/README.md`](../muse/README.md) explains it.
+A Muse space can run a front end plus server actions, with its own storage and scheduled jobs. It cannot run a Node server, a long-running process or files on disk. The finished space is in [`muse/`](../muse): Muse copies it as [`muse/manifest.json`](../muse/manifest.json) lists it, and [`muse/README.md`](../muse/README.md) explains it. The manifest also holds the steps for a new space and for updating one made from any earlier version. The README's two prompts only send Muse to it, so they never change between versions.
 
 | Tracker needs | In the space |
 |---|---|
@@ -113,7 +113,7 @@ A Muse space can run a front end plus server actions, with its own storage and s
 | `loadMarketCache` / `saveMarketCache` | `getSnapshot` / `saveSnapshotEntries` on the `market_cache` table |
 | A snapshot fresh while the app is closed | `refreshMarketCache` every 10 minutes ([`muse/space.json`](../muse/space.json)) |
 
-The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on. `npm test` also covers the bridge's retried load and the style repair below, and checks that `app/portfolio-tracker.js` builds no code from strings, which Muse's publishing check refuses.
+The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on. `npm test` also covers the bridge's retried load and the style repair below. It checks that `app/portfolio-tracker.js` builds no code from strings, which Muse's publishing check refuses, and that the manifest matches the code and the committed app file.
 
 Muse's builder also rewrites every `x.style` in the space's code, the chart library's included, to go through its style checker (`__tunnel`), which turns every value into text. The chart library keeps each shape's colours in plain objects called `style`, so the app's first module, [`src/platform/style-tunnel.ts`](../src/platform/style-tunnel.ts), sends only page elements to the checker. Without it, chart labels show as solid boxes and some charts don't draw. A host that rewrites code the same way needs nothing more; elsewhere the module does nothing.
 

@@ -15,7 +15,7 @@ This page is for people who want to know how the tracker works inside, or who wa
 A Muse space runs a front end, server actions, its own storage and scheduled jobs. It can't run a Node server, listen on a port or use files on disk. The tracker is built around that, in two parts:
 
 - **The app:** [`app/portfolio-tracker.js`](../app/portfolio-tracker.js). It holds the whole app (code, styles and fonts) in one prebuilt file of about 690 KB compressed. It loads nothing else, so Muse has nothing to unpack or rebuild. Muse does rewrite every `x.style` in it to go through its own style checker. The app's first module, [`src/platform/style-tunnel.ts`](../src/platform/style-tunnel.ts), keeps that checker to page elements so the charts' own shape styles stay intact ([details](../muse/README.md#how-it-works)).
-- **The space around it:** [`muse/`](../muse). It holds the page, a 30-line bridge, two storage tables, six server actions and the 10-minute refresh, listed for Muse in [`muse/manifest.json`](../muse/manifest.json).
+- **The space around it:** [`muse/`](../muse). It holds the page, a 30-line bridge, two storage tables, six server actions and the 10-minute refresh, listed for Muse in [`muse/manifest.json`](../muse/manifest.json). The manifest also holds the steps for a new space and for updating any earlier one. The README's prompts only point to it, so they work for every version ([details](../muse/README.md#the-prompts-and-the-manifest)).
 
 | Part of the space | What it does |
 |---|---|
@@ -104,8 +104,8 @@ This section is for contributors. Using the tracker in Meta Muse needs none of i
 **Requirements:** Node.js 20 or newer (23.6 or newer to run the tests).
 
 ```bash
-git clone https://github.com/AxiaMil/portfolio-tracker.git
-cd portfolio-tracker
+git clone https://github.com/AxiaMil/free-portfolio-tracker.git
+cd free-portfolio-tracker
 npm install
 npm run dev
 ```
@@ -116,7 +116,7 @@ npm run dev
 |---|---|
 | `npm run dev` | Starts the development server, with hot reload |
 | `npm test` | Runs the engine, Muse server and Muse bridge tests, and checks the built app (no network needed) |
-| `npm run build:app` | Rebuilds `app/`, including `app/portfolio-tracker.js`, the file Muse copies. Run it before committing any app change |
+| `npm run build:app` | Rebuilds `app/`, including `app/portfolio-tracker.js`, the file Muse copies, and writes that file's size and hash into `muse/manifest.json`. Run it before committing any app change |
 | `npm run build` | Builds the static app into `dist/` |
 | `npm run preview` | Serves the last build locally, to check it before release |
 | `npm start` | `npm run build`, then `npm run preview` |
@@ -143,7 +143,7 @@ npm run dev
 │   ├── theme.ts       Design tokens and chart colours for each theme
 │   ├── store.ts       App state, market-data loading and auto refresh
 │   └── format.ts      Money / percentage formatting
-├── tests/             Engine, Muse server, Muse bridge, Muse style checker and build-output tests (npm test)
+├── tests/             Engine, Muse server, bridge, style checker, manifest and prompts, and build-output tests
 ├── public/
 │   └── host.js        Host bridge template for running app/ outside Muse
 └── docs/

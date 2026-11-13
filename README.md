@@ -62,46 +62,27 @@ Three steps. No coding, nothing to install and no new account.
 
 ### Step 1: Paste this into Muse
 
-Copy the whole box below (use the copy button at its top right) and send it to Muse. It tells Muse to copy the finished tracker, so you get exactly the app shown here.
+Copy the whole box below (use the copy button at its top right) and send it to Muse. It tells Muse to copy the finished tracker, so you get exactly the app shown here, in its latest version.
 
 ```text
-Create a space that runs the ready-made Portfolio Tracker web app from
-https://github.com/AxiaMil/portfolio-tracker (MIT licence).
+Create a space that runs Portfolio Tracker, a finished open-source app (MIT licence), from
+https://github.com/AxiaMil/free-portfolio-tracker
 
-The repository contains the finished space. Build it by copying, not by designing:
-- Copy the files listed in muse/manifest.json to the places it gives:
-  muse/space.json -> space.json, muse/client/index.html -> client/index.html,
-  muse/client/src/main.ts and host.ts -> client/src/,
-  muse/server/src/actions.ts, market.ts and schema.ts -> server/src/.
-- Copy app/portfolio-tracker.js byte for byte to client/src/portfolio-tracker.js. It is the
-  whole app in one prebuilt, tested file and loads nothing else. It never builds code from a
-  string (no eval or Function()), so it passes the publishing check as it is: never patch it.
-  At start-up it keeps the space's style checker (__tunnel) for page elements only, so its
-  chart labels draw correctly. That is intended: leave it.
-- Connect only the two lines that depend on this space's starter, and change nothing else:
-  client/src/host.ts imports callAction(name, input) from the starter's server-action client,
-  and server/src/actions.ts imports db from the starter's Drizzle database.
-- Remove the starter's own App component, styles and #root. The page holds only #app.
+Build it by copying, not by designing. Read muse/manifest.json from the main branch and
+follow its "howToUse.newSpace" steps exactly. It lists every file to copy and where it goes,
+the storage, the server actions, the network access and the scheduled job. Fetch each file
+fresh from the main branch.
 
-Do not edit, rebuild, minify, split, unpack, restyle, translate, re-implement or port the app.
-Do not add anything to the interface: no header, title bar, avatar, labels under the
-navigation icons, banner, tips or notes. Do not add sample data: the app starts empty.
+Always:
+- Copy the app file byte for byte. Never edit, patch, rebuild, minify, split, unpack, restyle,
+  translate or re-implement it. If a check or the publishing step objects to it, don't change
+  it: tell me what it said.
+- Add nothing to the interface: no header, title bar, avatar, labels under the navigation
+  icons, banner, tips or notes. Add no sample data: the app starts empty.
+- Show every time in my local time zone, from my device. Never set or force a time zone.
+- No login, no API keys, and no network access beyond what the manifest lists.
 
-Time: the app shows every time in the user's local time zone, taken from their device. Do not
-set, force or convert a time zone anywhere in the space (never force UTC).
-
-Storage: the two tables in server/src/schema.ts. app_state holds the whole portfolio as one
-JSON document under the key "portfolio"; market_cache holds the market snapshot.
-Server actions: the six in server/src/actions.ts. Scheduled job: refreshMarketCache every
-10 minutes, as in space.json. Network access: query1.finance.yahoo.com and
-query2.finance.yahoo.com only. No other database, no login, no API keys.
-
-When it is ready, run refreshMarketCache once, then check: Home shows 0.00 with an empty
-chart; the + button opens "Manage Transaction"; adding "Buy AAPL, 10 shares" shows a value
-within a few seconds; Allocation's donut labels (such as AAPL and its share) are then plain
-text, with no box behind them; Home's "Last Updated" line shows the user's local time and time zone
-(such as GMT+8 in Singapore); Settings -> Data & Backup says "Muse space storage"; reloading
-the space keeps the transaction.
+When it's ready, go through the manifest's "checks" and tell me the result.
 ```
 
 ### Step 2: Say yes to Yahoo Finance
@@ -112,45 +93,32 @@ Muse asks whether the space may connect to two Yahoo Finance addresses. Approve 
 
 Tap **+** to add a buy or a sell, or upload a file of your trades (see [Adding your trades](#adding-your-trades)). Your space starts with one empty portfolio called *My Portfolio*.
 
-<details>
-<summary><b>Muse changed how it looks?</b></summary>
+### Update or repair your space
 
-Send Muse this:
-
-```text
-Undo every change you made to the tracker. Rebuild the space from the muse/ folder of
-https://github.com/AxiaMil/portfolio-tracker exactly as muse/manifest.json lists it, with
-app/portfolio-tracker.js copied byte for byte. No extra header, title, avatar, navigation
-labels, banners or notes.
-```
-
-</details>
-
-<details>
-<summary><b>Made your space with an earlier version?</b></summary>
-
-Send Muse this to update it. Your portfolio is kept:
+Send this to Muse inside your space whenever you want the latest version, or if Muse has changed how the tracker looks or works. It works whichever version your space has now, and your portfolio is kept.
 
 ```text
-Update this space to the current Portfolio Tracker space in the muse/ folder of
-https://github.com/AxiaMil/portfolio-tracker (latest main), exactly as muse/manifest.json
-lists it, with app/portfolio-tracker.js copied byte for byte to client/src/.
-- Keep the app_state and market_cache tables and all their rows as they are: they already
-  match server/src/schema.ts. Do not reset or migrate the saved portfolio.
-- Replace the old front end (the embedded app/ files, blob URLs, import map, boot ladder and
-  fetch cache) with client/index.html, client/src/main.ts and client/src/host.ts. The app now
-  does the caching, request limits, retries and snapshot loading itself.
-- Replace the server actions with server/src/actions.ts and market.ts. Keep the 10-minute
-  refreshMarketCache job.
-- Times show in the user's local time zone, from their device. Do not set or force a time zone.
-- The current app file builds no code from strings (no eval or Function()), so it passes the
-  publishing check as it is. Never patch it.
-- At start-up the app keeps the space's style checker (__tunnel) for page elements only, so
-  its chart labels draw correctly. That is intended: leave it.
-Do not change the app or add anything around it.
+Update this space to the latest Portfolio Tracker from
+https://github.com/AxiaMil/free-portfolio-tracker and undo any changes made to it.
+
+Read muse/manifest.json from the main branch and follow its "howToUse.existingSpace" steps
+exactly. They work whatever version this space has now. Fetch each file fresh from the main
+branch: don't reuse a copy from earlier in our conversation or from this space.
+
+Always:
+- Keep my saved data: every row of the tables the manifest lists. Never delete, reset,
+  re-create, migrate or reseed them, and add no sample or test data.
+- Copy the app file byte for byte. Never edit, patch, rebuild, minify, split, unpack, restyle,
+  translate or re-implement it. If a check or the publishing step objects to it, don't change
+  it: tell me what it said.
+- Remove anything the manifest doesn't list: files left from earlier versions, and anything
+  added around the app (a header, title bar, avatar, navigation labels, banner, tips or notes).
+- Show every time in my local time zone, from my device. Never set or force a time zone.
+
+When it's done, go through the manifest's "checks" and tell me the result.
 ```
 
-</details>
+Both prompts stay the same from version to version. Each version's details (which files to copy, where they go, and what to check) are in [`muse/manifest.json`](muse/manifest.json), which Muse reads from the latest version.
 
 ## How it compares with other apps
 
@@ -199,7 +167,7 @@ This tracker isn't perfect for everyone. The downsides:
 - **Prices come from Yahoo Finance's free feed.** It can be delayed, depending on the exchange, and is sometimes unavailable. When that happens, the app shows the last prices it had.
 - **No tax reports, price alerts or news.** It shows the gain on every trade and exports everything to a spreadsheet, but it doesn't make tax forms or send alerts.
 - **Upcoming dividends are estimates**, based on what each holding paid over the last 12 months.
-- **No support team.** It's a free open-source project. You can report problems on [GitHub](https://github.com/AxiaMil/portfolio-tracker/issues).
+- **No support team.** It's a free open-source project. You can report problems on [GitHub](https://github.com/AxiaMil/free-portfolio-tracker/issues).
 
 ## Screenshots
 
@@ -283,6 +251,10 @@ Any stock, ETF, fund, REIT, index or cryptocurrency that Yahoo Finance lists, su
 
 Yes. It's saved in your space, so every device that opens the space sees the same portfolio.
 
+### How do I get the latest version?
+
+Send Muse the prompt in [Update or repair your space](#update-or-repair-your-space). It's the same prompt for every version, it always brings in the latest one, and your portfolio is kept.
+
 ### Prices look out of date, or the refresh button is amber.
 
 Prices update every minute while the app is open, and your space refreshes them every 10 minutes while it's closed. Tap the refresh button to update now. It turns amber when Yahoo Finance can't be reached, and the app shows the last prices it had.
@@ -297,7 +269,7 @@ Tap **Try again**. Your portfolio is safe: the app never saves over it when it c
 
 ### Chart labels show as solid boxes, or a chart is missing.
 
-Your space has a copy from before 13 November 2026. Update it with the prompt in [Made your space with an earlier version?](#step-3-add-your-investments). Your portfolio is kept.
+Your space has a copy from before 13 November 2026. Send Muse the prompt in [Update or repair your space](#update-or-repair-your-space). Your portfolio is kept.
 
 ### A ticker can't be found.
 

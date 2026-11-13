@@ -1,6 +1,25 @@
 # Muse space scaffold
 
-Everything a [Meta Muse](https://about.fb.com/news/2026/11/introducing-spaces-customize-muse-app/) space needs to run Portfolio Tracker. Muse copies these files; it doesn't design anything. The copy-and-paste prompt is in the main README under [Get it in Meta Muse](../README.md#get-it-in-meta-muse), and [`manifest.json`](manifest.json) lists the same thing in machine-readable form.
+Everything a [Meta Muse](https://about.fb.com/news/2026/11/introducing-spaces-customize-muse-app/) space needs to run Portfolio Tracker. Muse copies these files; it doesn't design anything.
+
+## The prompts and the manifest
+
+The main README has two copy-and-paste prompts: one to [create a space](../README.md#step-1-paste-this-into-muse) and one to [update or repair](../README.md#update-or-repair-your-space) a space made from any earlier version. Neither names a file, table or action. Both send Muse to [`manifest.json`](manifest.json) on the main branch, so the same prompt always installs the latest version. Everything that can change between versions is in the manifest:
+- `howToUse.newSpace` and `howToUse.existingSpace`: the steps for each case. Updating keeps every saved row and removes whatever earlier versions or later edits left behind.
+- `app`, `files` and `starterParts`: what to copy and where. `app.bytes` and `app.sha256` let Muse check that its copy of the app is exact. `npm run build:app` writes them.
+- `storage`, `actions`, `network`, `cron` and `time`: what the space needs.
+- `checks`: what to look at when it's done.
+
+When you change the space, change the manifest with it, not the prompts. `npm test` fails when they drift apart:
+- a prompt names something that can change;
+- a quoted key or step reference is missing from the manifest;
+- a file in this folder isn't listed;
+- the actions, tables, network access or job differ from the code;
+- the app's size or hash is stale.
+
+A fork uses its own repository URL in the prompts, in `repository` here and in `package.json`.
+
+## Files
 
 | Repository file | In the space | What it is |
 |---|---|---|
@@ -47,3 +66,4 @@ On phones, the bottom navigation and full-screen dialogs keep clear of the phone
 - `client/src/host.ts`, with a fake in place of the starter's `./api`: the retried first load, and a failed load that throws instead of returning an empty portfolio.
 - `src/platform/style-tunnel.ts`, against a copy of Muse's style checker: chart shapes keep their own values, and page elements still go through Muse.
 - `app/portfolio-tracker.js`, the file the space copies: it must build no code from strings.
+- `manifest.json` and the README's prompts: the prompts stay generic, and the manifest matches this folder, the code and the committed app file.

@@ -1,13 +1,37 @@
 {
   "name": "Portfolio Tracker",
-  "about": "What a Meta Muse space for this app consists of. Copy the files as listed; nothing is designed or rewritten.",
+  "about": "Everything a Meta Muse space needs to run Portfolio Tracker. The space is built by copying these files as listed; nothing is designed or rewritten. Always read this file from the main branch: it describes the current version, and its steps work whatever version a space has now.",
+  "repository": "https://github.com/AxiaMil/free-portfolio-tracker",
+  "branch": "main",
+  "howToUse": {
+    "newSpace": [
+      "Fetch every file named here fresh from the main branch of the repository. Never reuse a copy from an earlier conversation, an earlier version or another space.",
+      "Copy app.source byte for byte to app.copyTo and follow app.rules. The copy must then be exactly app.bytes bytes long (with the SHA-256 app.sha256, if you can compute one). If it isn't, fetch it once more. If it still isn't, keep the fetched file as it is and tell the user both sizes: never fix it by hand.",
+      "Copy each file in files to the place it gives, unchanged.",
+      "Connect only the imports that starterParts names to this space's starter, and remove what starterParts.remove names.",
+      "Create the tables in storage.tables as server/src/schema.ts defines them.",
+      "Set up exactly the server actions in actions, the network access in network (the user approves it) and the scheduled job in cron. Follow time.",
+      "Run refreshMarketCache once. Then go through checks.newSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
+    ],
+    "existingSpace": [
+      "This updates or repairs a space made from any earlier version of this file, including one that was changed since it was made.",
+      "Fetch every file named here fresh from the main branch of the repository. Never reuse a copy from an earlier conversation, an earlier version or the space itself.",
+      "Keep the saved data: every row of every table in storage.tables, as it is. Never drop, clear, reset, re-create, migrate or reseed a table, and add no sample or test data. The app reads saved data from any earlier version and fills in what is new itself. If server/src/schema.ts has a table or column the space lacks, add it without touching existing rows.",
+      "Replace the app file and every file in files with the fresh copies, exactly as for a new space, including the app.bytes check.",
+      "Remove everything in the space's client and server code that this file doesn't list, except the starter's own modules that starterParts names. That includes leftovers from earlier versions (such as embedded copies of the app/ folder, blob URLs, an import map, a boot ladder, a fetch cache, or a patched or second copy of the app) and anything added around the app (a header, title bar, avatar, navigation labels, banner, tips, notes or restyling).",
+      "Make the server actions, network access and scheduled jobs exactly actions, network and cron: add what is missing, update what differs and remove what isn't listed. Follow time.",
+      "Run refreshMarketCache once. Then go through checks.existingSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
+    ]
+  },
   "app": {
     "source": "app/portfolio-tracker.js",
     "copyTo": "client/src/portfolio-tracker.js",
+    "bytes": 2163519,
+    "sha256": "a035d285a9e80d745ea2f8cc814785f05d8f38c653a0706e70135d39e10caf65",
     "rules": [
-      "byte for byte: never edit, rebuild, minify, split, unpack, restyle, translate or port it",
+      "byte for byte: never edit, rebuild, minify, split, unpack, restyle, translate or port it. bytes and sha256 above are the file's own; npm run build:app writes them",
       "it is the whole front end, full screen; it mounts itself into #app and loads no other file",
-      "it never builds code from a string (no eval or Function()), so it passes the publishing check unchanged: never patch it",
+      "it never builds code from a string (no eval or Function()), so it passes the publishing check unchanged: never patch it. If a check objects to it anyway, leave the file as it is and tell the user what the check said",
       "at start-up it keeps the space's style checker (__tunnel) for page elements only, so the chart library's own style objects keep their values and chart labels draw correctly: this is intended, leave it",
       "nothing is added to the interface: no header, title bar, avatar, navigation labels, banner, tips or notes",
       "no sample data: a new space starts empty"
@@ -49,15 +73,23 @@
   },
   "network": ["query1.finance.yahoo.com", "query2.finance.yahoo.com"],
   "cron": [{ "id": "portfolio-tracker-market-refresh-10m", "action": "refreshMarketCache", "every": "10m" }],
+  "time": "the app shows every time in the user's local time zone, taken from their device. Never set, force or convert a time zone anywhere in the space (never force UTC)",
   "notNeeded": ["a database beyond the two tables", "login", "API keys or cookies", "any other network access"],
-  "checks": [
-    "Home shows 0.00 with an empty chart",
-    "the + button opens \"Manage Transaction\"",
-    "adding \"Buy AAPL, 10 shares\" shows a value within a few seconds",
-    "the Allocation page's donut labels (such as AAPL and its share) are then plain text, with no box behind them",
-    "Home's \"Last Updated\" line shows the user's local time and time zone (such as GMT+8 in Singapore), never forced to UTC",
-    "Settings → Data & Backup → Where it is saved says \"Muse space storage\"",
-    "reloading the space keeps the transaction",
-    "after refreshMarketCache has run once, a fresh device opens Home on the saved prices within a couple of seconds"
-  ]
+  "checks": {
+    "newSpace": [
+      "Home shows 0.00 with an empty chart",
+      "adding \"Buy AAPL, 10 shares\" shows a value within a few seconds",
+      "reloading the space keeps the transaction"
+    ],
+    "existingSpace": [
+      "Home shows the saved portfolio with the same holdings as before the update; nothing was added to it"
+    ],
+    "always": [
+      "the + button opens \"Manage Transaction\"",
+      "the Allocation page's donut labels (a ticker and its share, such as \"AAPL: 100.0%\") are plain text, with no box behind them",
+      "Home's \"Last Updated\" line shows the user's local time and time zone (such as GMT+8 in Singapore), never forced to UTC",
+      "Settings → Data & Backup → Where it is saved says \"Muse space storage\"",
+      "after refreshMarketCache has run once, a fresh device opens Home on the saved prices within a couple of seconds"
+    ]
+  }
 }
