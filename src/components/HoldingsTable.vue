@@ -30,6 +30,7 @@ const detail = ref<string | null>(null);
 
 interface Col { key: string; label: string; get: (h: Holding) => number | string | null; fmt: (h: Holding) => string; cls?: (h: Holding) => string; help?: string; cash?: (h: Holding) => string }
 
+const TBP_HELP = 'Dividends past their ex-dividend date that have not reached your cash yet, after withholding tax. They count in your value from the ex-date and move to cash on the payment date the company published (Dividends page).';
 const COLS: Record<View, Col[]> = {
   Overview: [
     { key: 'allocation', label: 'Allocation', get: (h) => h.allocation, fmt: (h) => alloc(h.allocation), cash: (h) => alloc(h.allocation) },
@@ -162,6 +163,11 @@ const SORT_OPTIONS = [
                 </v-menu>
               </td>
             </tr>
+            <tr v-if="showCash && page === 1 && result.toBePaidRow" class="cash-row tbp-row" data-test="to-be-paid">
+              <td class="tick"><b>Dividends to be paid</b> <HelpTip :size="14" :text="TBP_HELP" icon="mdi-information" /></td>
+              <td v-for="c in COLS[view]" :key="c.key">{{ c.cash ? c.cash(result.toBePaidRow) : '' }}</td>
+              <td class="menu-cell" />
+            </tr>
             <tr v-for="h in paged" :key="h.symbol">
               <td class="tick"><button class="tick-btn" @click="detail = h.symbol"><b>{{ h.symbol }}</b><span class="name" :title="h.name">{{ h.name }}</span></button></td>
               <td v-for="c in COLS[view]" :key="c.key" :class="c.cls ? c.cls(h) : ''">
@@ -213,6 +219,9 @@ const SORT_OPTIONS = [
       </div>
       <div v-if="showCash && mobilePage === 1" class="hcard cash">
         <b>{{ ccySymbol(result.base) }} Cash</b><span>{{ alloc(result.cashRow.allocation) }}</span><span>{{ money(result.cashRow.marketValue) }}</span>
+      </div>
+      <div v-if="showCash && mobilePage === 1 && result.toBePaidRow" class="hcard cash" data-test="to-be-paid">
+        <b>Dividends to be paid <HelpTip :size="14" :text="TBP_HELP" icon="mdi-information" /></b><span>{{ alloc(result.toBePaidRow.allocation) }}</span><span>{{ money(result.toBePaidRow.marketValue) }}</span>
       </div>
       <div v-for="h in mobileRows" :key="h.symbol" class="hcard" @click="detail = h.symbol">
         <div class="hc-left">

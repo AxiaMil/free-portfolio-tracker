@@ -8,6 +8,8 @@ import { historicalWindow, pivotByMonth, positionRows, upcomingWindow, type DivE
 import { hidden, money, num, pct } from '../../format.ts';
 import PillToggle from '../PillToggle.vue';
 import ShareButton from '../ShareButton.vue';
+import PayDateDialog from './PayDateDialog.vue';
+import { sourceName, sourceTag } from './payoutSources.ts';
 
 const props = defineProps<{ events: DivEvent[] }>();
 const { mdAndUp } = useDisplay();
@@ -48,13 +50,25 @@ const pagedPos = computed(() => posRows.value.slice(from.value ? from.value - 1 
 
 const dm = (v: number) => money(v, { decimals: Math.abs(v) >= 100 ? 0 : 2 });
 const plain = (v: number | null | undefined) => (hidden() ? '••••' : num(v ?? null, 2));
-const labelClass = (l: DivLabel) => (l === 'Confirmed' ? 'conf' : l === 'Received' ? 'recv' : 'est');
+const labelClass = (l: DivLabel) => (l === 'Confirmed' ? 'conf' : l === 'Paid' ? 'recv' : l === 'To be paid' ? 'due' : 'est');
 const LABEL_HELP: Record<DivLabel, string> = {
-  Received: 'Paid out and counted in your cash balance.',
-  Confirmed: 'Ex-dividend and payment dates announced; the amount is the latest declared rate.',
-  'Estimated*': 'Ex-dividend date announced; payment date and amount are estimates.',
+  Paid: 'Paid into your cash on its payment date.',
+  'To be paid': 'Past its ex-dividend date, so it counts in your value and gains; it reaches your cash on its payment date.',
+  Confirmed: 'Announced by the company: the ex-dividend date is ahead.',
   Estimated: 'Projected from last year\'s payout of the same period, adjusted for the latest dividend growth.',
 };
+/** the pay date as shown: the date, or a note when the company's isn't published here */
+const payText = (e: DivEvent) => (e.payKnown ? e.payDate : e.status === 'estimated' ? `~${e.payDate}` : 'Not published');
+const payTip = (e: DivEvent) => (e.payKnown ? `Payment date from ${sourceName(e.paySource)}` : e.status === 'estimated' ? 'Estimated from the usual time between ex-date and payment' : 'The payment date isn\'t published here yet');
+/** automatic dividends past their ex-date: you can type or correct the payment date */
+const canEdit = (e: DivEvent) => !e.manual && (e.status === 'received' || e.status === 'toBePaid');
+const editing = ref<DivEvent | null>(null);
+const editOpen = ref(false);
+function editPay(e: DivEvent) {
+  if (!canEdit(e)) return;
+  editing.value = e;
+  editOpen.value = true;
+}
 
 function addDividend(symbol: string) {
   openAddTransaction({ action: 'Dividend', symbol, date: today.value });
@@ -70,7 +84,7 @@ function csv(): Array<Array<string | number>> {
       ...posRows.value.map((r) => [r.symbol, r.shares, r.marketValue.toFixed(2), r.annualPerShare.toFixed(4), r.projected.toFixed(2), (r.yield * 100).toFixed(2) + '%', (r.yieldOnCost * 100).toFixed(2) + '%', r.receivedTTM.toFixed(2), r.nextEx ?? '', r.nextPay ?? ''])];
   }
   if (group.value === 'Transaction') {
-    return [['Ticker', 'Ex-Date', 'Pay Date', 'Status', 'Div per Share', 'Shares', 'Amount'], ...txRows.value.map((e) => [e.symbol, e.exDate, e.payDate, e.label, e.perShareBase.toFixed(4), e.shares, e.amountBase.toFixed(2)])];
+    return [['Ticker', 'Ex-Date', 'Pay Date', 'Pay Date Source', 'Status', 'Div per Share', 'Shares', 'Amount'], ...txRows.value.map((e) => [e.symbol, e.exDate, e.payKnown ? e.payDate : '', e.payKnown ? sourceName(e.paySource) : '', e.label, e.perShareBase.toFixed(4), e.shares, e.amountBase.toFixed(2)])];
   }
   const ms = win.value.months;
   return [['Ticker', ...ms, 'Total'], ...pivot.value.rows.map((r) => [r.symbol, ...ms.map((m) => (r.cells[m] ?? 0).toFixed(2)), r.total.toFixed(2)]), ['Total', ...ms.map((m) => (pivot.value.totals[m] ?? 0).toFixed(2)), pivot.value.total.toFixed(2)]];
@@ -135,7 +149,16 @@ function csv(): Array<Array<string | number>> {
               <tr v-for="e in pagedTx" :key="e.key">
                 <td class="tk">{{ e.symbol }}</td>
                 <td>{{ e.exDate }}</td>
-                <td>{{ e.payDate }}</td>
+                <td>
+                  <v-tooltip :text="payTip(e)" max-width="300">
+                    <template #activator="{ props: a }">
+                      <button v-if="canEdit(e)" v-bind="a" class="pay" :class="{ unk: !e.payKnown }" :aria-label="`Payment date of ${e.symbol} ex ${e.exDate}`" @click="editPay(e)">
+                        {{ payText(e) }}<span v-if="e.payKnown && sourceTag(e.paySource)" class="src">{{ sourceTag(e.paySource) }}</span><v-icon size="14" class="ed">mdi-pencil</v-icon>
+                      </button>
+                      <span v-else v-bind="a" class="pay" :class="{ unk: !e.payKnown }">{{ payText(e) }}<span v-if="e.payKnown && sourceTag(e.paySource)" class="src">{{ sourceTag(e.paySource) }}</span></span>
+                    </template>
+                  </v-tooltip>
+                </td>
                 <td>
                   <v-tooltip :text="LABEL_HELP[e.label]" max-width="300"><template #activator="{ props: a }"><span v-bind="a" class="st" :class="labelClass(e.label)">{{ e.label }}</span></template></v-tooltip>
                 </td>
@@ -165,7 +188,7 @@ function csv(): Array<Array<string | number>> {
                 <td class="num">{{ pct(r.yieldOnCost, { sign: false }) }}</td>
                 <td class="num">{{ money(r.receivedTTM) }}</td>
                 <td>{{ r.nextEx ?? '-' }}</td>
-                <td>{{ r.nextPay ?? '-' }}</td>
+                <td :class="{ unk: r.nextEx && !r.nextPay }">{{ r.nextPay ?? (r.nextEx ? 'Not published' : '-') }}</td>
               </tr>
               <tr v-if="!posRows.length"><td colspan="10" class="empty">No dividend-paying holdings</td></tr>
             </tbody>
@@ -185,8 +208,18 @@ function csv(): Array<Array<string | number>> {
         <template v-if="view !== 'Position'">
           <div v-for="e in pagedTx" :key="e.key" class="dcard">
             <div class="dc-h">
-              <span class="sym">{{ e.symbol }}</span><span class="date">{{ e.payDate }}</span>
+              <span class="sym">{{ e.symbol }}</span>
               <span class="st" :class="labelClass(e.label)">{{ e.label }}</span>
+            </div>
+            <div class="dc-r"><span>Ex-Date</span><span>{{ e.exDate }}</span></div>
+            <div class="dc-r">
+              <span>Pay Date</span>
+              <span>
+                <button v-if="canEdit(e)" class="pay" :class="{ unk: !e.payKnown }" :aria-label="`Payment date of ${e.symbol} ex ${e.exDate}`" @click="editPay(e)">
+                  {{ payText(e) }}<span v-if="e.payKnown && sourceTag(e.paySource)" class="src">{{ sourceTag(e.paySource) }}</span><v-icon size="14" class="ed">mdi-pencil</v-icon>
+                </button>
+                <span v-else class="pay" :class="{ unk: !e.payKnown }">{{ payText(e) }}<span v-if="e.payKnown && sourceTag(e.paySource)" class="src">{{ sourceTag(e.paySource) }}</span></span>
+              </span>
             </div>
             <div class="dc-r"><span>Div Amount</span><span>{{ plain(e.amountBase) }}</span></div>
             <div class="dc-r"><span>Shares</span><span>{{ plain(e.shares) }}</span></div>
@@ -195,7 +228,7 @@ function csv(): Array<Array<string | number>> {
         </template>
         <template v-else>
           <div v-for="r in pagedPos" :key="r.symbol" class="dcard">
-            <div class="dc-h"><span class="sym">{{ r.symbol }}</span><span class="date">{{ r.nextPay ? `next ${r.nextPay}` : '' }}</span></div>
+            <div class="dc-h"><span class="sym">{{ r.symbol }}</span><span class="date">{{ r.nextPay ? `next paid ${r.nextPay}` : r.nextEx ? `next ex ${r.nextEx}` : '' }}</span></div>
             <div class="dc-r"><span>Projected (12M)</span><span>{{ plain(r.projected) }}</span></div>
             <div class="dc-r"><span>Shares</span><span>{{ plain(r.shares) }}</span></div>
             <div class="dc-r"><span>Yield</span><span>{{ pct(r.yield, { sign: false }) }}</span></div>
@@ -215,6 +248,7 @@ function csv(): Array<Array<string | number>> {
         <PillToggle v-model="perPhone" :options="['10', '20', '50'] as const" size="sm" />
       </div>
     </template>
+    <PayDateDialog v-model="editOpen" :event="editing" />
   </div>
 </template>
 
@@ -241,6 +275,11 @@ function csv(): Array<Array<string | number>> {
 .st.conf { color: var(--pos); }
 .st.recv { color: var(--text-2); }
 .st.est { color: var(--text); }
+.st.due { color: var(--warn); }
+.pay { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; }
+button.pay { cursor: pointer; border-radius: 6px; .ed { color: var(--muted); } &:hover { text-decoration: underline; .ed { color: var(--text); } } }
+.unk, .pay.unk { color: var(--muted); }
+.src { font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 6px; background: var(--line-soft); color: var(--text-2); }
 .pager { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; font-size: 14px; color: var(--text); }
 .pager.desk { justify-content: flex-end; gap: 6px; padding: 6px 12px; margin: 0; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-2); span { margin-right: 8px; } }
 .pg { background: none; border: 0; color: var(--text); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; &:disabled { color: var(--faint); cursor: default; } &:hover:not(:disabled) { background: var(--line-soft); } }

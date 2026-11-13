@@ -7,27 +7,27 @@
     "newSpace": [
       "Fetch every file named here fresh from the main branch of the repository. Never reuse a copy from an earlier conversation, an earlier version or another space.",
       "Copy app.source byte for byte to app.copyTo and follow app.rules. The copy must then be exactly app.bytes bytes long (with the SHA-256 app.sha256, if you can compute one). If it isn't, fetch it once more. If it still isn't, keep the fetched file as it is and tell the user both sizes: never fix it by hand.",
-      "Copy each file in files to the place it gives, unchanged.",
+      "Copy each file in files to the place it gives, unchanged. Create each file in spaceOwnFiles from its template.",
       "Connect only the imports that starterParts names to this space's starter, and remove what starterParts.remove names.",
       "Create the tables in storage.tables as server/src/schema.ts defines them.",
       "Set up exactly the server actions in actions, the network access in network (the user approves it) and the scheduled job in cron. Follow time.",
-      "Run refreshMarketCache once. Then go through checks.newSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
+      "Run refreshMarketCache once. Set up dividend payment dates as payouts.forMuse says: the built-in connectors need nothing, and you write this space's own connector for the user's holdings they don't cover. Then go through checks.newSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
     ],
     "existingSpace": [
       "This updates or repairs a space made from any earlier version of this file, including one that was changed since it was made.",
       "Fetch every file named here fresh from the main branch of the repository. Never reuse a copy from an earlier conversation, an earlier version or the space itself.",
       "Keep the saved data: every row of every table in storage.tables, as it is. Never drop, clear, reset, re-create, migrate or reseed a table, and add no sample or test data. The app reads saved data from any earlier version and fills in what is new itself. If server/src/schema.ts has a table or column the space lacks, add it without touching existing rows.",
-      "Replace the app file and every file in files with the fresh copies, exactly as for a new space, including the app.bytes check.",
-      "Remove everything in the space's client and server code that this file doesn't list, except the starter's own modules that starterParts names. That includes leftovers from earlier versions (such as embedded copies of the app/ folder, blob URLs, an import map, a boot ladder, a fetch cache, or a patched or second copy of the app) and anything added around the app (a header, title bar, avatar, navigation labels, banner, tips, notes or restyling).",
+      "Replace the app file and every file in files with the fresh copies, exactly as for a new space, including the app.bytes check. Never replace the files in spaceOwnFiles: they are this space's own (create one from its template only if it is missing).",
+      "Remove everything in the space's client and server code that this file doesn't list, except the starter's own modules that starterParts names and the files in spaceOwnFiles. That includes leftovers from earlier versions (such as embedded copies of the app/ folder, blob URLs, an import map, a boot ladder, a fetch cache, or a patched or second copy of the app) and anything added around the app (a header, title bar, avatar, navigation labels, banner, tips, notes or restyling).",
       "Make the server actions, network access and scheduled jobs exactly actions, network and cron: add what is missing, update what differs and remove what isn't listed. Follow time.",
-      "Run refreshMarketCache once. Then go through checks.existingSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
+      "Run refreshMarketCache once. Set up dividend payment dates as payouts.forMuse says: the built-in connectors need nothing, and you write this space's own connector for the user's holdings they don't cover. Then go through checks.existingSpace and checks.always, and tell the user the result, the commit you copied from and the size of the app file you copied."
     ]
   },
   "app": {
     "source": "app/portfolio-tracker.js",
     "copyTo": "client/src/portfolio-tracker.js",
-    "bytes": 2173870,
-    "sha256": "cb1517f4ed101e4dafd1b73b546dc4c5612d8f8e36bb082a101a83ed87f87289",
+    "bytes": 2194329,
+    "sha256": "ec1610fb742d83710fb5d597bc318c7e2e39daecfe7bb95d1434c04107f919e7",
     "rules": [
       "byte for byte: never edit, rebuild, minify, split, unpack, restyle, translate or port it. bytes and sha256 above are the file's own; npm run build:app writes them",
       "it is the whole front end, full screen; it mounts itself into #app and loads no other file",
@@ -45,7 +45,14 @@
     "muse/client/src/host.ts": "client/src/host.ts",
     "muse/server/src/actions.ts": "server/src/actions.ts",
     "muse/server/src/market.ts": "server/src/market.ts",
+    "muse/server/src/payouts.ts": "server/src/payouts.ts",
     "muse/server/src/schema.ts": "server/src/schema.ts"
+  },
+  "spaceOwnFiles": {
+    "server/src/custom-payouts.ts": {
+      "template": "muse/server/src/custom-payouts.ts",
+      "rule": "this space's own dividend-date connector, written for the user's holdings that no built-in connector covers (payouts.forMuse). Create it from the template when the space doesn't have it; never replace, reset or remove it on an update"
+    }
   },
   "starterParts": {
     "client/src/api.ts": "the starter's own server-action client; client/src/host.ts imports callAction(name, input) from it",
@@ -61,7 +68,8 @@
       "app_state/portfolio": "the whole app state as one JSON document",
       "market_cache/chart:<SYMBOL>": "daily history, dividends, splits",
       "market_cache/spark:<SYM,SYM,...>": "latest quotes, up to 20 symbols",
-      "market_cache/search:<SYMBOL>": "company profile"
+      "market_cache/search:<SYMBOL>": "company profile",
+      "market_cache/payouts:<SYMBOL>": "each dividend's ex-date and payment date, from the exchange or the space's own connector"
     }
   },
   "actions": {
@@ -70,12 +78,31 @@
     "yahooGet": { "input": "{ url }", "returns": "parsed JSON body, also for non-200 answers", "allow": ["https://query1.finance.yahoo.com/", "https://query2.finance.yahoo.com/"], "timeoutSeconds": 20 },
     "getSnapshot": { "input": "{ since? }", "returns": "{ entries: [{ key, data, fetchedAt }], updatedAt }" },
     "saveSnapshotEntries": { "input": "{ entries } (at most 60)", "returns": "{ ok, saved }" },
-    "refreshMarketCache": { "input": {}, "returns": "{ ok, symbols, updated, failed, at }" }
+    "refreshMarketCache": { "input": {}, "returns": "{ ok, symbols, updated, failed, payouts, at }" },
+    "getPayouts": { "input": "{ asks: [{ symbol, exchange?, currency?, name? }], force? }", "returns": "{ ok, payouts: { [symbol]: { records, source, checkedAt, error? } } }", "note": "dividend payment dates from the built-in connectors (server/src/payouts.ts), then the space's own (server/src/custom-payouts.ts); the app calls it to check now" }
   },
-  "network": ["query1.finance.yahoo.com", "query2.finance.yahoo.com"],
+  "network": ["query1.finance.yahoo.com", "query2.finance.yahoo.com", "api.sgx.com", "api.nasdaq.com", "asx.api.markitdigital.com"],
+  "networkOwn": "besides network: the hosts in CUSTOM_HOSTS of server/src/custom-payouts.ts, each approved by the user when the connector is written",
   "cron": [{ "id": "portfolio-tracker-market-refresh-10m", "action": "refreshMarketCache", "every": "10m" }],
+  "payouts": {
+    "what": "Each dividend's payment date, so the app adds a dividend to cash on the day the company pays it, and counts it as \"to be paid\" from its ex-date until then. Yahoo's free data has only the ex-date.",
+    "builtIn": {
+      "sgx": "Singapore (.SI): shares, REITs and ETFs, full history, from SGX's own corporate actions",
+      "nasdaq": "US shares and ETFs listed on Nasdaq, full history, from Nasdaq",
+      "asx": "Australia (.AX): each latest dividend, kept as they build up, from the ASX",
+      "setup": "none: no sign-up, API key, login or cookies. refreshMarketCache looks each dividend-paying holding up once a day"
+    },
+    "forMuse": [
+      "After refreshMarketCache has run, read the payouts:<SYMBOL> rows in market_cache. A row whose source is null is a holding no built-in connector covers (such as a US share on NYSE or NYSE Arca, or a Hong Kong, London, Tokyo or Bursa listing). The app lists the same holdings under Settings → Dividend dates as \"Ask your Muse\".",
+      "For exactly those holdings, write customPayouts in server/src/custom-payouts.ts, following the rules at the top of that file. Read the dividend announcements where they are published for free: the exchange's own announcements first (such as HKEXnews for .HK or the London Stock Exchange's RNS for .L), otherwise the company's investor-relations dividend page or the dividend announcement that comes with each quarterly or half-yearly result. Return each dividend's ex-date and payment date as the company published them.",
+      "No sign-up, API key, login or cookies, and never estimate a date: a dividend whose payment date isn't published yet gets payDate null.",
+      "Put every host it reads in CUSTOM_HOSTS and ask the user to approve them as network access.",
+      "Call getPayouts with force: true for those holdings and check that each one now has records with payment dates. Tell the user in plain words where each holding's dates now come from, and name any you could not connect: they can type those dates on the Dividends page.",
+      "Later, when the user asks you to connect dividend dates for some holdings (the app's \"Ask your Muse\" gives them the sentence to send), do the same for the holdings named, adding to customPayouts without changing what already works."
+    ]
+  },
   "time": "the app shows every time in the user's local time zone, taken from their device. Never set, force or convert a time zone anywhere in the space (never force UTC)",
-  "notNeeded": ["a database beyond the two tables", "login", "API keys or cookies", "any other network access"],
+  "notNeeded": ["a database beyond the two tables", "login", "API keys or cookies", "any other network access (besides networkOwn)"],
   "checks": {
     "newSpace": [
       "Home shows 0.00 with an empty chart",
@@ -90,7 +117,8 @@
       "the Allocation page's donut labels (a ticker and its share, such as \"AAPL: 100.0%\") are plain text, with no box behind them",
       "Home's \"Last Updated\" line shows the user's local time and time zone (such as GMT+8 in Singapore), never forced to UTC",
       "Settings → Data & Backup → Where it is saved says \"Muse space storage\"",
-      "after refreshMarketCache has run once, a fresh device opens Home on the saved prices within a couple of seconds"
+      "after refreshMarketCache has run once, a fresh device opens Home on the saved prices within a couple of seconds",
+      "Settings → Dividend dates lists each dividend-paying holding with where its payment dates come from; none says \"Ask your Muse\" once payouts.forMuse is done, except those you told the user you couldn't connect"
     ]
   }
 }

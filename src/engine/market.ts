@@ -1,6 +1,6 @@
 // Fast lookups over market data: price on a date (forward-filled), FX to base currency,
 // live quote overlay for today, split adjustments and instrument metadata.
-import type { ChartData, CustomAsset, MarketBundle, Profile, Quote } from './types.ts';
+import type { ChartData, CustomAsset, MarketBundle, PayoutInfo, PayoutRecord, Profile, Quote } from './types.ts';
 import { lastIndexLE } from './util.ts';
 
 interface Series {
@@ -89,6 +89,27 @@ export class MarketView {
 
   profile(symbol: string): Profile | undefined {
     return this.bundle.profiles[symbol];
+  }
+
+  /** what the connectors know about a holding's dividend dates (undefined: not looked up) */
+  payoutInfo(symbol: string): PayoutInfo | undefined {
+    return this.bundle.payouts?.[symbol];
+  }
+
+  /**
+   * The announced payout for the dividend Yahoo dates `exDate`: the same ex-date, or else one at most 3 days away
+   * (a market holiday or a late correction), the nearest first.
+   */
+  payoutFor(symbol: string, exDate: string): PayoutRecord | null {
+    const recs = this.bundle.payouts?.[symbol]?.records;
+    if (!recs?.length) return null;
+    let best: PayoutRecord | null = null;
+    let gap = 4;
+    for (const r of recs) {
+      const g = Math.abs(Date.parse(r.exDate) - Date.parse(exDate)) / 864e5;
+      if (g < gap) { gap = g; best = r; }
+    }
+    return best;
   }
 
   /** trading currency of an instrument (after minor-unit normalisation) */

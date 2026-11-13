@@ -1,17 +1,24 @@
-// The space's server actions. Six actions; the app reaches them through window.portfolioHost (client/bridge.ts).
+// The space's server actions. Seven actions; the app reaches them through window.portfolioHost (client/host.ts).
 //
 //   getPortfolio()                      -> { state }            the saved portfolio, or null the first time
 //   savePortfolio({ state })            -> { ok: true }         the whole portfolio as one JSON document
 //   yahooGet({ url })                   -> parsed JSON body     allow-listed Yahoo Finance GET
 //   getSnapshot({ since? })             -> { entries, updatedAt } market snapshot rows fetched after `since`
 //   saveSnapshotEntries({ entries })    -> { ok, saved }        fresh quotes / profiles from the open app
-//   refreshMarketCache()                -> { ok, symbols, updated, failed, at }  run every 10 minutes (space.json)
+//   refreshMarketCache()                -> { ok, symbols, updated, failed, payouts, at }  every 10 minutes (space.json)
+//   getPayouts({ asks, force? })        -> { ok, payouts }      dividend payment dates from the exchanges (payouts.ts)
 //
 // The only line to connect is the `db` import: this space's Drizzle database from the Spaces starter.
+// custom-payouts.ts is the space's own dividend-date connector (Muse writes it where no built-in one covers a holding).
 import { eq, gt, inArray } from 'drizzle-orm';
 import { db } from './db';
 import { appState, marketCache } from './schema';
 import * as market from './market';
+import { fetchPayouts, mergePayouts } from './payouts';
+import { customPayouts } from './custom-payouts';
+
+/** the dividend-date connectors: the built-in ones, then this space's own */
+const payoutKit: market.PayoutKit = { fetchPayouts, mergePayouts, custom: customPayouts };
 
 const STATE_KEY = 'portfolio';
 
@@ -73,7 +80,12 @@ export async function saveSnapshotEntries(input: { entries: unknown }) {
   return market.saveSnapshotEntries(store, input?.entries);
 }
 
-/** the scheduled job (every 10 minutes, open or not) */
+/** the scheduled job (every 10 minutes, open or not); payment dates at most once a day per holding */
 export async function refreshMarketCache(_input: Record<string, never> = {}) {
-  return market.refreshMarketCache(store);
+  return market.refreshMarketCache(store, undefined, undefined, payoutKit);
+}
+
+/** payment dates for the holdings asked about, from the exchanges' own data; force = the app's "Check now" */
+export async function getPayouts(input: { asks: unknown[]; force?: boolean }) {
+  return market.getPayouts(store, input, payoutKit);
 }

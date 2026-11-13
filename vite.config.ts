@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fetchPayouts, type PayoutAsk } from './muse/server/src/payouts.ts';
 
 // The app builds to plain static files (dist/) with relative paths, so any static host can serve it.
 // Browsers can't call Yahoo Finance directly (it sends no CORS headers), so `npm run dev` and `npm start`
@@ -23,6 +24,47 @@ const proxy = {
   '/yahoo/q2': yahoo('https://query2.finance.yahoo.com', '/yahoo/q2'),
 };
 const port = Number(process.env.PORT) || 5178;
+
+/**
+ * Dividend payment dates for `npm run dev` and `npm start`: GET ./payouts?asks=[{symbol,exchange},...] runs the same
+ * keyless connectors a Muse space does (muse/server/src/payouts.ts) and answers { ok, payouts }. An answer is kept
+ * for an hour, so opening the app again doesn't ask the exchanges again.
+ */
+function payoutRoute(): Plugin {
+  const memo = new Map<string, { at: number; row: unknown }>();
+  const HOUR = 3600_000;
+  const handler = async (req: { url?: string }, res: { statusCode: number; setHeader(k: string, v: string): void; end(b: string): void }) => {
+    try {
+      const u = new URL(req.url ?? '', 'http://local');
+      const force = u.searchParams.get('force') === '1';
+      const asks = (JSON.parse(u.searchParams.get('asks') ?? '[]') as PayoutAsk[])
+        .filter((a) => typeof a?.symbol === 'string' && a.symbol.length <= 30).slice(0, 60);
+      const payouts: Record<string, unknown> = {};
+      for (let i = 0; i < asks.length; i += 3) {
+        await Promise.all(asks.slice(i, i + 3).map(async (a) => {
+          const hit = memo.get(a.symbol);
+          if (hit && Date.now() - hit.at < (force ? 60_000 : HOUR)) { payouts[a.symbol] = hit.row; return; }
+          const r = await fetchPayouts({ symbol: a.symbol.toUpperCase(), exchange: a.exchange ?? null, currency: a.currency ?? null, name: a.name ?? null });
+          const row = { records: r.records, source: r.source, checkedAt: Date.now(), ...(r.error ? { error: r.error } : {}) };
+          memo.set(a.symbol, { at: Date.now(), row });
+          payouts[a.symbol] = row;
+        }));
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ ok: true, payouts }));
+    } catch (e) {
+      res.statusCode = 400;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ ok: false, error: String(e instanceof Error ? e.message : e) }));
+    }
+  };
+  return {
+    name: 'portfolio-payouts',
+    configureServer(server) { server.middlewares.use('/payouts', (req, res) => void handler(req, res)); },
+    configurePreviewServer(server) { server.middlewares.use('/payouts', (req, res) => void handler(req, res)); },
+  };
+}
 
 const SINGLE_JS = 'portfolio-tracker.js';
 const SINGLE_HTML = `<!doctype html>
@@ -98,7 +140,7 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
   return {
     base: './',
-    plugins: [vue(), vuetify({ autoImport: true }), single && oneFile()],
+    plugins: [vue(), vuetify({ autoImport: true }), payoutRoute(), single && oneFile()],
     server: { port, strictPort: true, proxy },
     preview: { port, strictPort: true, proxy },
     define: single ? { 'process.env.NODE_ENV': JSON.stringify('production') } : undefined,

@@ -43,7 +43,7 @@ All of it is free. Nothing is locked behind a paid plan.
 
 - **What it's worth today.** Your total value, today's change, and your gain or loss since you started.
 - **Are you beating the market?** Compare your returns with the S&P 500 or any other index, over a month, a year or all time.
-- **Dividend income.** What you've received, what's coming, a payment calendar and your yield. Set your withholding tax rate and it shows what actually reaches you.
+- **Dividend income.** What you've received, what's coming, a payment calendar and your yield, with each dividend's ex-dividend date and the date the company pays it. Set your withholding tax rate and it shows what actually reaches you.
 - **Where your money is.** By company, sector, country, region and type, so you can spot when too much sits in one place.
 - **How bumpy the ride is.** Your biggest drop from a high, how much your value swings, and more.
 - **Goals.** Set a target, like 100,000 by 2035, and see each month whether you're on track.
@@ -85,9 +85,11 @@ Always:
 When it's ready, go through the manifest's "checks" and tell me the result.
 ```
 
-### Step 2: Say yes to Yahoo Finance
+### Step 2: Say yes to the market data addresses
 
-Muse asks whether the space may connect to two Yahoo Finance addresses. Approve both. That's where prices, dividends and exchange rates come from. Only ticker symbols such as `AAPL` are sent, never your amounts.
+Muse asks whether the space may connect to Yahoo Finance and to three stock exchanges: SGX (Singapore), Nasdaq and the ASX (Australia). Approve them all. Yahoo Finance gives prices, dividends and exchange rates; the exchanges give the dates dividends are paid. Only ticker symbols such as `AAPL` are sent, never your amounts.
+
+If you hold shares none of those cover, such as a New York Stock Exchange or Hong Kong share, Muse sets up a source for them itself, from the exchange's or the company's own announcements. It asks you to approve those addresses too. There's no account or key to set up.
 
 ### Step 3: Add your investments
 
@@ -166,7 +168,8 @@ This tracker isn't perfect for everyone. The downsides:
 - **Your broker doesn't send trades in by itself.** You add them by hand or upload a file from your broker.
 - **Prices come from Yahoo Finance's free feed.** It can be delayed, depending on the exchange, and is sometimes unavailable. When that happens, the app shows the last prices it had.
 - **No tax reports, price alerts or news.** It shows the gain on every trade and exports everything to a spreadsheet, but it doesn't make tax forms or send alerts.
-- **Upcoming dividends are estimates**, based on what each holding paid over the last 12 months.
+- **Upcoming dividends are estimates** until the company announces them, based on what each holding paid over the last 12 months.
+- **Payment dates come from the exchanges.** SGX, Nasdaq and the ASX are built in. For anything else, your Muse connects a source made for you, or you type the date.
 - **No support team.** It's a free open-source project. You can report problems on [GitHub](https://github.com/AxiaMil/free-portfolio-tracker/issues).
 
 ## Screenshots
@@ -226,7 +229,7 @@ The full list of columns and actions is in [Technical details](docs/TECHNICAL.md
 ## Your privacy
 
 - Your trades, portfolios and goals are saved in your own Muse space, and nowhere else.
-- To get prices, your space sends ticker symbols (like `AAPL`) to Yahoo Finance. Your amounts, name and accounts are never sent.
+- To get prices and dividend dates, your space sends ticker symbols (like `AAPL`) to Yahoo Finance and to the stock exchanges. Your amounts, name and accounts are never sent.
 - There are no ads and no sign-up.
 - Your device keeps recent copies of your data and prices, so the app opens fast and works offline. You can restore those copies in **Settings → Data & Backup**.
 - Download a backup file whenever you want a copy of your own.
@@ -288,6 +291,12 @@ Search uses Yahoo Finance's ticker symbols, which add a suffix for many exchange
 ### Why are my dividends lower than what my shares pay?
 
 If you've set a dividend tax rate (*Settings → Portfolio Settings*), the Dividends page and each holding show what you get after tax. The Dividends page's top line shows the amount before tax, the tax, and what's left. On Home, the P&L breakdown shows dividends before tax, with the tax under *Taxes*.
+
+### Why does a dividend say "to be paid"?
+
+A dividend has two dates. On the **ex-dividend date** the share price drops by the dividend, and the dividend becomes yours. On the **payment date**, weeks later sometimes, the money arrives. From the ex-dividend date the app counts the dividend in your value and gains, as *to be paid*. It adds it to your cash only on the payment date the company published. Until then it shows under **Dividends to be paid**, next to your cash.
+
+Payment dates come from SGX, Nasdaq and the ASX, and from a source your Muse sets up for anything else. *Settings → Dividend Dates* shows where each holding's dates come from. If one says **Ask your Muse**, tap **Copy request** and send it to your Muse. You can also type any payment date yourself: tap it on the Dividends page.
 
 ### Is this financial advice?
 

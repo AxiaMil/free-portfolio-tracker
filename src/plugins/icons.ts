@@ -4,12 +4,12 @@
 import { defineComponent, h, type Component } from 'vue';
 import type { IconSet } from 'vuetify';
 import {
-  ArchiveRestore, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, ArrowUpDown, Banknote, Briefcase, Calculator, Calendar,
+  ArchiveRestore, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, ArrowUpDown, Banknote, Briefcase, Calculator, Calendar, CalendarCheck,
   ChartArea, ChartCandlestick, ChartColumn, ChartLine, ChartPie, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsLeft,
   ChevronsRight, ChevronsUpDown, Circle, CircleAlert, CircleCheck, CircleHelp, CirclePlus, CircleX, ClockAlert, CloudUpload, Copy, CopyPlus,
-  Database, Download, Ellipsis, EllipsisVertical, Eye, EyeOff, FileChartColumn, FileSpreadsheet, FileText, Filter, Folder, FolderClock, Gem,
+  Database, Download, Ellipsis, EllipsisVertical, Eye, EyeOff, FileChartColumn, FileSpreadsheet, FileText, Filter, Folder, FolderClock, Gem, Hourglass,
   Coins, House, Image, Info, LayoutDashboard, Lightbulb, List, ListFilter, LoaderCircle, Menu, Minus,
-  Paperclip, Palette, Pencil, Pipette, Plus, ReceiptText, RefreshCcw, RefreshCw, Scale, Search, Settings, Share, ShieldHalf, SlidersHorizontal,
+  Paperclip, Palette, Pencil, Pipette, Plus, ReceiptText, RefreshCcw, RefreshCw, Scale, Search, Settings, Share, ShieldHalf, SlidersHorizontal, Sparkles,
   Target, Trash2, TriangleAlert, User, Wallet, X,
 } from 'lucide-vue-next';
 
@@ -121,6 +121,9 @@ const MAP: Record<string, Component> = {
   'mdi-cash-multiple': Wallet,
   'mdi-calculator': Calculator,
   'mdi-calendar': Calendar,
+  'mdi-calendar-check': CalendarCheck,
+  'mdi-creation': Sparkles,
+  'mdi-timer-sand': Hourglass,
   'mdi-briefcase': Briefcase,
   'mdi-database': Database,
   'mdi-database-outline': Database,

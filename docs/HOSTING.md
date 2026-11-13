@@ -2,14 +2,15 @@
 
 Portfolio Tracker is a static web app. The repository ships a prebuilt, tested copy in [`app/`](../app). `npm run build` writes the same files to `dist/` from your own checkout, and `npm run build:app` refreshes `app/`. Every path is relative and routes use `#/`, so any static host can serve them from the domain root or a sub-folder, with no rewrite rules and no build step on the host.
 
-The app reaches outside the browser in only two places. A host platform can take over both:
+The app reaches outside the browser in only three places. A host platform can take over each:
 
 | Seam | Default | File |
 |---|---|---|
 | **Saving your data** | This browser's `localStorage`, falling back to IndexedDB | [`src/platform/storage.ts`](../src/platform/storage.ts) |
 | **Market data** (Yahoo Finance) | The `./yahoo/…` route that `npm run dev` / `npm start` forwards | [`src/market/client.ts`](../src/market/client.ts) |
+| **Dividend payment dates** (SGX, Nasdaq, ASX) | The `./payouts` route that `npm run dev` / `npm start` serves | [`muse/server/src/payouts.ts`](../muse/server/src/payouts.ts) |
 
-Both are switched through one optional object, `window.portfolioHost`. Define it in any of these places:
+All are switched through one optional object, `window.portfolioHost`. Define it in any of these places:
 
 - in `host.js`, next to `index.html` ([`public/host.js`](../public/host.js), or `app/host.js` in the prebuilt copy), which the app loads before its own code. As shipped it holds only comments and changes nothing;
 - on the page itself, before the [one-file build](#the-one-file-build) runs;
@@ -50,6 +51,9 @@ window.portfolioHost = {
   // market data the host keeps between visits (raw Yahoo responses), and fresh responses to keep
   async loadMarketCache(since) { /* … */ },
   async saveMarketCache(entries) { /* … */ },
+
+  // dividend payment dates for these holdings, looked up on the server side
+  async fetchPayouts(asks, { force }) { /* … */ },
 };
 ```
 
@@ -60,10 +64,12 @@ Every member is optional:
   - The app doesn't retry `loadState`, so retry inside the bridge if the host's first call can fail for a moment (the Muse bridge does, below).
 - **`fetchJson(url)`** is the first route the app tries for market data. It receives full `https://query1.finance.yahoo.com/…` or `https://query2.finance.yahoo.com/…` URLs. Return the parsed JSON (Yahoo answers errors as JSON too, so pass those through). Throw only when the request itself fails. The app retries a failed request once after 0.7 s. It then tries its other routes and, failing those, shows cached prices with the refresh button in amber.
 - **`loadMarketCache(since)`** lets a new device open at once, without waiting for market data. It returns raw Yahoo responses as `[{ key, data, fetchedAt }]` (or `{ entries }`).
-  - Keys: `chart:<SYMBOL>` (the chart response), `spark:<SYM,SYM,…>` (a quote response for up to 20 symbols) and `search:<SYMBOL>` (the profile search response).
+  - Keys: `chart:<SYMBOL>` (the chart response), `spark:<SYM,SYM,…>` (a quote response for up to 20 symbols), `search:<SYMBOL>` (the profile search response) and `payouts:<SYMBOL>` (payment dates, as `fetchPayouts` returns them).
   - `since` is roughly when the device last had live data (0 the first time). Entries fetched before it can be left out.
   - The app parses each entry exactly like a live answer and keeps it wherever it is newer than the device's own copy. It never waits for the cache longer than 2 s.
 - **`saveMarketCache(entries)`** receives the same kind of entries: fresh quotes and profiles the open app fetched. They arrive at most every 15 s, 60 per call, and right away when the page is hidden. Saving them is best effort; errors are ignored.
+
+- **`fetchPayouts(asks, { force })`** looks up dividend payment dates. `asks` is `[{ symbol, exchange, currency, name }]`, one per holding that pays dividends (`exchange` is Yahoo's exchange code, such as `SES` or `NMS`). Return `{ payouts: { [symbol]: { records, source, checkedAt, error? } } }`, where each record is `{ exDate, payDate, recordDate?, amount?, currency?, source }` with `yyyy-mm-dd` dates and `payDate: null` when the company hasn't published it. `fetchPayouts` in [`muse/server/src/payouts.ts`](../muse/server/src/payouts.ts) does the look-up for one ask and never throws, so a server can call it as it is. The app asks when its copy is more than 12 hours old; `force` is set when the user taps **Check now**. Without `fetchPayouts`, the app uses the `./payouts` route if there is one, and otherwise shows each dividend's payment date as not published, so the user can type it.
 
 If the saved state can't be read (`loadState` throws, or takes more than 30 s), the app shows that with a **Try again** button. It never starts empty over existing data.
 
@@ -79,7 +85,15 @@ Every request is an HTTP `GET` without cookies or keys:
 | Latest quotes (up to 20 symbols per call) | `https://query1.finance.yahoo.com/v7/finance/spark?symbols=…&range=1d&interval=1d` |
 | Ticker search and company profiles | `https://query2.finance.yahoo.com/v1/finance/search?q=…&quotesCount=…&newsCount=0&listsCount=0&enableFuzzyQuery=false` |
 
-FX rates are charts too (for example `USDSGD=X`). A server-side fetch should allow these two hosts and nothing else:
+Payment-date look-ups (from the server, through `fetchPayouts` or `./payouts`, never from the browser):
+
+| Exchange | URL |
+|---|---|
+| SGX | `https://api.sgx.com/marketmetadata/v2?stock-code={code}`, then `https://api.sgx.com/corporateactions/v1.0?…&ibmcode={id}&cat=DIVIDEND…` |
+| Nasdaq | `https://api.nasdaq.com/api/quote/{symbol}/dividends?assetclass=stocks` (or `etf`) |
+| ASX | `https://asx.api.markitdigital.com/asx-research/1.0/companies/{code}/key-statistics` |
+
+FX rates are charts too (for example `USDSGD=X`). A server-side Yahoo fetch should allow these two hosts and nothing else:
 
 ```js
 // a minimal server action / serverless function
@@ -111,7 +125,8 @@ A Muse space can run a front end plus server actions, with its own storage and s
 | `loadState` / `saveState` | `getPortfolio` / `savePortfolio`: one JSON document under `portfolio` in the `app_state` table. On a phone, the first call of a session can fail once while the phone's bridge starts, so [`muse/client/src/host.ts`](../muse/client/src/host.ts) retries a failed load after 0.7, 1.5, 3 and 5 s, then throws |
 | `fetchJson` | `yahooGet`: allow-listed to `query1.finance.yahoo.com` and `query2.finance.yahoo.com`, which Muse's Sentinel asks you to approve |
 | `loadMarketCache` / `saveMarketCache` | `getSnapshot` / `saveSnapshotEntries` on the `market_cache` table |
-| A snapshot fresh while the app is closed | `refreshMarketCache` every 10 minutes ([`muse/space.json`](../muse/space.json)) |
+| `fetchPayouts` | `getPayouts`: the SGX, Nasdaq and ASX connectors, plus the space's own connector that Muse writes for holdings they don't cover ([`muse/README.md`](../muse/README.md#dividend-payment-dates-set-up-by-muse)) |
+| A snapshot fresh while the app is closed | `refreshMarketCache` every 10 minutes ([`muse/space.json`](../muse/space.json)), with payment dates once a day |
 
 The server logic is in [`muse/server/src/market.ts`](../muse/server/src/market.ts). It has no dependencies and is covered by `npm test`, including a round trip: what the scheduled refresh stores is what the app opens on. `npm test` also covers the bridge's retried load and the style repair below. It checks that `app/portfolio-tracker.js` builds no code from strings, which Muse's publishing check refuses, and that the manifest matches the code and the committed app file.
 
@@ -141,7 +156,7 @@ The UI already fits Muse's phone view:
 | Setup | Market data route |
 |---|---|
 | The prebuilt `app/` on any static host | As for any static host below, or `window.portfolioHost.fetchJson` |
-| `npm run dev` or `npm start` on your computer | Built in: the Vite server forwards `./yahoo/q1` and `./yahoo/q2` |
+| `npm run dev` or `npm start` on your computer | Built in: the Vite server forwards `./yahoo/q1` and `./yahoo/q2`, and serves payment dates at `./payouts` |
 | Any static host (GitHub Pages, Netlify, S3, nginx …) | Build with `VITE_MARKET_PROXY` pointing at a forwarding endpoint you run, or forward `yahoo/q1/*` and `yahoo/q2/*` next to `index.html` with a reverse proxy |
 | An app platform with server functions | `window.portfolioHost.fetchJson`, as above |
 

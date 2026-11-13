@@ -20,9 +20,9 @@ const shift = (n: number) => { cursor.value = addMonths(cursor.value, n); };
 const byDay = computed(() => {
   const map = new Map<string, DivEvent[]>();
   for (const e of props.events) {
-    const list = map.get(e.payDate) ?? [];
+    const list = map.get(e.when) ?? [];
     list.push(e);
-    map.set(e.payDate, list);
+    map.set(e.when, list);
   }
   return map;
 });

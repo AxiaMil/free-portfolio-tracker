@@ -6,7 +6,7 @@ import { computePortfolio, type EngineResult } from './engine/portfolio.ts';
 import type { PeriodKey } from './engine/periods.ts';
 import { todayLocal, uid } from './engine/util.ts';
 import { freshState, loadState, newPortfolio, requestPersistence, saveState } from './platform/storage.ts';
-import { cachedCharts, cachedProfiles, cachedQuotes, getCharts, getProfiles, getQuotes, search, seedFromHost } from './market/client.ts';
+import { cachedCharts, cachedPayouts, cachedProfiles, cachedQuotes, getCharts, getPayouts, getProfiles, getQuotes, search, seedFromHost, type PayoutAsk } from './market/client.ts';
 
 export { newPortfolio };
 
@@ -23,6 +23,8 @@ export const store = reactive({
   progress: { done: 0, total: 0 },
   error: '' as string,
   refreshing: false,
+  /** looking up dividend payment dates (Settings → Dividend dates) */
+  checkingPayouts: false,
   offline: false,
   lastUpdated: null as number | null,
   saveError: '',
@@ -141,6 +143,27 @@ async function loadProfiles(symbols: string[], force = false) {
   market.value = { ...market.value, profiles: { ...market.value.profiles, ...profiles } };
 }
 
+/** the holdings whose dividends need payment dates: listed ones that have paid a dividend */
+function payoutAsks(): PayoutAsk[] {
+  const { assets } = neededSymbols();
+  return assets
+    .filter((s) => market.value.charts[s]?.dividends?.length)
+    .map((s) => { const c = market.value.charts[s]; return { symbol: s, exchange: c?.exchange ?? null, currency: c?.currency ?? null, name: c?.name ?? null }; });
+}
+
+/** dividend payment dates from the exchanges (see market/client.ts); `force` = Settings' "Check now" */
+export async function loadPayouts(force = false) {
+  const asks = payoutAsks();
+  if (!asks.length) return;
+  store.checkingPayouts = true;
+  try {
+    const payouts = await getPayouts(asks, { force });
+    market.value = { ...market.value, payouts: { ...market.value.payouts, ...payouts } };
+  } finally {
+    store.checkingPayouts = false;
+  }
+}
+
 /**
  * Brings market data up to date. By default only symbols not loaded yet (e.g. after adding a transaction);
  * `all` checks every symbol against its cache age, `force` downloads everything again (the refresh button).
@@ -164,8 +187,9 @@ export async function refreshMarket(force = false, all = false) {
   } finally {
     store.refreshing = false;
   }
-  // company details (name, sector, country) come last, so they never hold up prices; nothing waits for them
+  // company details (name, sector, country) and payment dates come last, so they never hold up prices
   loadProfiles(pick(assets, market.value.profiles)).catch((e) => console.warn('profiles failed', e));
+  loadPayouts(force).catch((e) => console.warn('payment dates failed', e));
 }
 
 /**
@@ -182,8 +206,8 @@ async function openFromCache(): Promise<boolean> {
   const fx = fxPairs(symbols);
   const fxCharts = await cachedCharts(fx);
   if (Object.keys(fxCharts).length < fx.length) return false;
-  const [quotes, profiles] = await Promise.all([cachedQuotes([...symbols, ...fx]), cachedProfiles(assets)]);
-  market.value = { charts: { ...charts, ...fxCharts }, quotes, profiles };
+  const [quotes, profiles, payouts] = await Promise.all([cachedQuotes([...symbols, ...fx]), cachedProfiles(assets), cachedPayouts(assets)]);
+  market.value = { charts: { ...charts, ...fxCharts }, quotes, profiles, payouts };
   const times = Object.values(quotes).map((q) => q.fetchedAt).filter(Boolean);
   if (times.length) store.lastUpdated = Math.max(...times);
   return true;

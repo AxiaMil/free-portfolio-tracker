@@ -7,7 +7,9 @@ Everything a [Meta Muse](https://about.fb.com/news/2026/11/introducing-spaces-cu
 The main README has two copy-and-paste prompts: one to [create a space](../README.md#step-1-paste-this-into-muse) and one to [update or repair](../README.md#update-or-repair-your-space) a space made from any earlier version. Neither names a file, table or action. Both send Muse to [`manifest.json`](manifest.json) on the main branch, so the same prompt always installs the latest version. Everything that can change between versions is in the manifest:
 - `howToUse.newSpace` and `howToUse.existingSpace`: the steps for each case. Updating keeps every saved row and removes whatever earlier versions or later edits left behind.
 - `app`, `files` and `starterParts`: what to copy and where. `app.bytes` and `app.sha256` let Muse check that its copy of the app is exact. `npm run build:app` writes them.
-- `storage`, `actions`, `network`, `cron` and `time`: what the space needs.
+- `spaceOwnFiles`: files that belong to the user's space, created once from a template and never replaced by an update.
+- `storage`, `actions`, `network`, `networkOwn`, `cron` and `time`: what the space needs.
+- `payouts`: where dividend payment dates come from, and `payouts.forMuse`, the steps Muse follows to connect a source for holdings no built-in one covers.
 - `checks`: what to look at when it's done.
 
 When you change the space, change the manifest with it, not the prompts. `npm test` fails when they drift apart:
@@ -27,8 +29,10 @@ A fork uses its own repository URL in the prompts, in `repository` here and in `
 | [`client/index.html`](client/index.html) | `client/index.html` | The page: only `#app` and the entry script |
 | [`client/src/main.ts`](client/src/main.ts) | `client/src/main.ts` | Connects the bridge, then runs the app |
 | [`client/src/host.ts`](client/src/host.ts) | `client/src/host.ts` | `window.portfolioHost`: storage and market data through the server actions. Retries the first portfolio load while a phone's bridge is still starting |
-| [`server/src/actions.ts`](server/src/actions.ts) | `server/src/actions.ts` | The six server actions |
+| [`server/src/actions.ts`](server/src/actions.ts) | `server/src/actions.ts` | The seven server actions |
 | [`server/src/market.ts`](server/src/market.ts) | `server/src/market.ts` | The yahooGet allow-list, the market snapshot and the scheduled refresh (no dependencies) |
+| [`server/src/payouts.ts`](server/src/payouts.ts) | `server/src/payouts.ts` | Dividend payment dates from SGX, Nasdaq and the ASX: public data, no key (no dependencies) |
+| [`server/src/custom-payouts.ts`](server/src/custom-payouts.ts) | `server/src/custom-payouts.ts` | The space's own payment-date connector. A template, created once: Muse fills it in for the user's holdings, and updates never replace it |
 | [`server/src/schema.ts`](server/src/schema.ts) | `server/src/schema.ts` | Two Drizzle tables: `app_state` and `market_cache` |
 | [`space.json`](space.json) | `space.json` | Name, entry and the 10-minute refresh job |
 
@@ -49,6 +53,8 @@ Two lines connect to the Spaces starter's own modules, and nothing else depends 
    - It never requests the same data twice at once, and it retries a failed request once.
    - Fresh quotes and profiles go back to the snapshot (`saveSnapshotEntries`) every 15 seconds at most.
 3. **While closed.** `refreshMarketCache` runs every 10 minutes and refreshes the snapshot: history, quotes and profiles for the active portfolio. A failed fetch never removes the last good data.
+   - Once a day it also looks up the payment dates of each holding that pays dividends (`payouts:<SYMBOL>` in the snapshot), from the built-in exchange connectors or the space's own. A failed look-up keeps the dates already known.
+   - The app asks for them through `getPayouts` too: when it opens on dates more than 12 hours old, and when you tap **Check now** in *Settings → Dividend Dates* (at most once a minute per holding).
 4. **Saving.** Every change saves the whole portfolio as one JSON document under `portfolio` (`savePortfolio`), about 350 ms after the change.
 
 The page loads one script, so there's nothing to unpack and no blob URLs. The script never builds code from a string (no `eval` or `Function()`), so it passes Muse's publishing check as it is and never needs patching.
@@ -59,10 +65,15 @@ In documents that refuse `history.pushState`, the app falls back to `#hash` navi
 
 On phones, the bottom navigation and full-screen dialogs keep clear of the phone's home bar and notch. Times, such as Home's *Last Updated*, show in the device's own time zone.
 
+## Dividend payment dates, set up by Muse
+
+Nothing here needs an account or an API key. SGX, Nasdaq and the ASX publish their dividend dates openly, so those connectors work as soon as the user approves their addresses. A holding none of them covers (a New York Stock Exchange or Hong Kong share, for example) shows **Ask your Muse** in *Settings → Dividend Dates*, with a request to copy. Muse then follows `payouts.forMuse` in the manifest: it finds a public, keyless source for those holdings, writes it into `server/src/custom-payouts.ts`, and adds its addresses to the space's network access, which the user approves. That file belongs to the user's space, so updating the space never replaces it. If no such source exists, the user can still type a payment date on the Dividends page.
+
 ## Tests
 
 `npm test` from the repository root (Node 23.6 or newer) covers this folder with plain Node and no network:
 - `server/src/market.ts`, against a fixed fake Yahoo: the allow-list, the scheduled refresh, the snapshot, and a round trip into the app (what the refresh stores is what the app opens on).
+- `server/src/payouts.ts`, against made-up answers in each exchange's own format: which connector covers which listing, dates and amounts, the space's own connector, failures reported and never thrown, and the daily look-up.
 - `client/src/host.ts`, with a fake in place of the starter's `./api`: the retried first load, and a failed load that throws instead of returning an empty portfolio.
 - `src/platform/style-tunnel.ts`, against a copy of Muse's style checker: chart shapes keep their own values, and page elements still go through Muse.
 - `app/portfolio-tracker.js`, the file the space copies: it must build no code from strings.

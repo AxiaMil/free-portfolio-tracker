@@ -25,12 +25,12 @@ const charts = computed(() => [left.value?.chart, right.value?.chart]);
 const tickerItems = computed(() => {
   const r = result.value;
   if (!r) return [];
-  return tickerSlices(r.holdings, metric.value === 'Cost' ? r.cashRow.costValue : r.cash, r.base, metric.value);
+  return tickerSlices(r.holdings, metric.value === 'Cost' ? r.cashRow.costValue : r.cash, r.base, metric.value, r.toBePaid);
 });
 const groupItems = computed(() => {
   const r = result.value;
   if (!r) return [];
-  return groupSlices(r.holdings, r.cash, r.base, group.value);
+  return groupSlices(r.holdings, r.cash, r.base, group.value, r.toBePaid);
 });
 
 const EMPTY: Record<TickerMetric, string> = {
@@ -38,7 +38,7 @@ const EMPTY: Record<TickerMetric, string> = {
 };
 const valueFmt = computed(() => (metric.value === 'Loss' ? (v: number) => money(-v) : metric.value === 'Gain' ? (v: number) => money(v, { sign: true }) : (v: number) => money(v)));
 
-const CASH_HELP = 'Uninvested cash in this portfolio: deposits, dividends and sale proceeds minus purchases, fees, taxes and withdrawals.';
+const CASH_HELP = 'Uninvested cash in this portfolio: deposits, dividends paid and sale proceeds minus purchases, fees, taxes and withdrawals. A dividend counts here from its payment date; before that it is under Dividends to be paid.';
 
 function csv(): Array<Array<string | number>> {
   const share = (items: Array<{ value: number }>, v: number) => {

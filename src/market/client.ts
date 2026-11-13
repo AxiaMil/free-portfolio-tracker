@@ -4,7 +4,7 @@
 //   2. proxy — VITE_MARKET_PROXY set at build time (any URL-forwarding endpoint you run yourself)
 //   3. local — ./yahoo/q1 and ./yahoo/q2 on the same origin (forwarded by `npm run dev` / `npm start`)
 //   4. direct — Yahoo itself (works where the runtime doesn't enforce CORS)
-import type { ChartData, Profile, Quote } from '../engine/types.ts';
+import type { ChartData, PayoutInfo, Profile, Quote } from '../engine/types.ts';
 import { host, type MarketCacheEntry } from '../platform/host.ts';
 import { kvGet, kvSet } from '../platform/kv.ts';
 import { YAHOO_HOSTS, fetchChart, fetchProfile, fetchQuotes, searchSymbols, type GetJson, type SearchHit } from './yahoo.ts';
@@ -225,6 +225,13 @@ export async function seedMarketCache(entries: MarketCacheEntry[]): Promise<numb
           quotesChanged = true;
           added++;
         }
+      } else if (e.key.startsWith('payouts:')) {
+        const symbol = e.key.slice(8);
+        const cur = await kvGet<PayoutInfo>(`payouts:${symbol}`);
+        const info = asPayoutInfo(e.data);
+        if (!info || (cur && (cur.checkedAt ?? 0) >= info.checkedAt)) continue;
+        await kvSet(`payouts:${symbol}`, plain(info));
+        added++;
       } else if (e.key.startsWith('search:')) {
         const symbol = e.key.slice(7);
         const cur = await kvGet<Profile & { fetchedAt?: number }>(`profile:${symbol}`);
@@ -331,4 +338,72 @@ export async function search(q: string): Promise<SearchHit[]> {
   } catch {
     return [];
   }
+}
+
+// ---------------- dividend payment dates ----------------
+// From the exchanges' own data, through the host (a Muse space's getPayouts action) or, with `npm run dev` /
+// `npm start`, the same connectors behind ./payouts. A static copy with neither has no payment dates: you type them.
+
+const PAYOUT_TTL_MS = 12 * 3600 * 1000;
+
+export interface PayoutAsk { symbol: string; exchange: string | null; currency: string | null; name: string | null }
+
+/** a saved or fetched payout row, checked; null when it isn't one */
+function asPayoutInfo(x: unknown): PayoutInfo | null {
+  const o = x as Partial<PayoutInfo> | null;
+  if (!o || !Array.isArray(o.records)) return null;
+  const records = o.records.filter((r) => r && typeof r.exDate === 'string').map((r) => ({
+    exDate: r.exDate, payDate: typeof r.payDate === 'string' ? r.payDate : null, recordDate: r.recordDate ?? null,
+    amount: typeof r.amount === 'number' ? r.amount : null, currency: r.currency ?? null, source: String(r.source ?? 'unknown'),
+  }));
+  return { records, source: typeof o.source === 'string' ? o.source : null, checkedAt: Number(o.checkedAt) || 0, ...(o.error ? { error: String(o.error) } : {}) };
+}
+
+/** which way payment dates can be looked up from here: the host, this app's own server, or none */
+export type PayoutRoute = 'host' | 'local' | null;
+let payoutRouteSeen: PayoutRoute | undefined;
+export function payoutRoute(): PayoutRoute | undefined {
+  return host()?.fetchPayouts ? 'host' : payoutRouteSeen;
+}
+
+export async function cachedPayouts(symbols: string[]): Promise<Record<string, PayoutInfo>> {
+  const out: Record<string, PayoutInfo> = {};
+  await Promise.all(symbols.map(async (s) => {
+    const p = asPayoutInfo(await kvGet<PayoutInfo>(`payouts:${s}`));
+    if (p) out[s] = p;
+  }));
+  return out;
+}
+
+/**
+ * Payment dates for the holdings asked about: from this device's copy while it is younger than 12 hours (unless
+ * `force`), else from the host or the local route. Whatever can't be fetched keeps its saved copy.
+ */
+export async function getPayouts(asks: PayoutAsk[], { force = false } = {}): Promise<Record<string, PayoutInfo>> {
+  const out = await cachedPayouts(asks.map((a) => a.symbol));
+  const now = Date.now();
+  const need = asks.filter((a) => force || !out[a.symbol] || now - out[a.symbol].checkedAt > PAYOUT_TTL_MS);
+  if (!need.length) return out;
+  let body: unknown = null;
+  const h = host();
+  try {
+    if (h?.fetchPayouts) {
+      body = await h.fetchPayouts(need, { force });
+    } else if (payoutRouteSeen !== null) {
+      const r = await fetch(`./payouts?asks=${encodeURIComponent(JSON.stringify(need))}${force ? '&force=1' : ''}`, { credentials: 'omit' });
+      body = (r.headers.get('content-type') ?? '').includes('json') ? await r.json() : null;
+      payoutRouteSeen = body && (body as { ok?: boolean }).ok ? 'local' : null;
+    }
+  } catch (e) {
+    if (!h?.fetchPayouts) payoutRouteSeen = null;
+    console.warn('payment dates unavailable', e);
+  }
+  const got = ((body ?? {}) as { payouts?: Record<string, unknown> }).payouts ?? {};
+  for (const a of need) {
+    const info = asPayoutInfo(got[a.symbol]);
+    if (!info) continue;
+    out[a.symbol] = info;
+    await kvSet(`payouts:${a.symbol}`, plain(info));
+  }
+  return out;
 }

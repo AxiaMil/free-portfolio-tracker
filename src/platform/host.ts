@@ -27,6 +27,13 @@ export interface PortfolioHost {
   loadMarketCache?: (since: number) => Promise<MarketCacheEntry[] | { entries: MarketCacheEntry[] } | null | undefined>;
   /** fresh quote (`spark:`) and profile (`search:`) responses the app fetched live, for the host to keep (best effort) */
   saveMarketCache?: (entries: MarketCacheEntry[]) => Promise<unknown>;
+  /**
+   * Dividend payment dates for these holdings, from the exchanges' own data (the connectors in
+   * muse/server/src/payouts.ts, plus any the host adds): `{ payouts: { [symbol]: { records, source, checkedAt } } }`.
+   * `force` asks again now (the "Check now" button) instead of answering from what the host saved today.
+   * A host's saved ones also come in through loadMarketCache, keyed `payouts:<SYMBOL>`.
+   */
+  fetchPayouts?: (asks: Array<{ symbol: string; exchange: string | null; currency: string | null; name: string | null }>, opts?: { force?: boolean }) => Promise<unknown>;
 }
 
 export interface MarketCacheEntry {

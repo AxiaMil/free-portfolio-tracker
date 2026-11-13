@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename } from 'node:path';
 import { ALLOWED_PREFIXES } from '../muse/server/src/market.ts';
+import { PAYOUT_HOSTS } from '../muse/server/src/payouts.ts';
 
 const root = new URL('../', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
@@ -79,11 +80,14 @@ test('it gives the committed app file\'s exact size and SHA-256', () => {
 
 test('every file it lists exists, and every file of the space is listed', () => {
   for (const from of Object.keys(manifest.files)) assert.ok(existsSync(new URL(from, root)), from);
+  // the space's own files (its dividend-date connector) come from a template and are never replaced
+  const templates = Object.values<{ template: string }>(manifest.spaceOwnFiles ?? {}).map((o) => o.template);
+  for (const t of templates) assert.ok(existsSync(new URL(t, root)), t);
   const own = new Set(['muse/README.md', 'muse/manifest.json']);
   const inMuse = readdirSync(new URL('muse/', root), { recursive: true })
     .map((f) => `muse/${String(f).replaceAll('\\', '/')}`)
     .filter((f) => statSync(new URL(f, root)).isFile() && !own.has(f));
-  assert.deepEqual(inMuse.filter((f) => !(f in manifest.files)), [], 'files of the space the manifest doesn\'t list');
+  assert.deepEqual(inMuse.filter((f) => !(f in manifest.files) && !templates.includes(f)), [], 'files of the space the manifest doesn\'t list');
   // the space's entry script imports the app under the name it is copied to
   assert.match(read('muse/client/src/main.ts'), new RegExp(`import '\\./${basename(manifest.app.copyTo).replace('.', '\\.')}'`));
 });
@@ -92,7 +96,8 @@ test('its actions, network access, tables and job match the code', () => {
   const exported = [...read('muse/server/src/actions.ts').matchAll(/^export async function (\w+)/gm)].map((m) => m[1]);
   assert.deepEqual(Object.keys(manifest.actions).sort(), exported.sort());
   assert.deepEqual(manifest.actions.yahooGet.allow, ALLOWED_PREFIXES);
-  assert.deepEqual(manifest.network, ALLOWED_PREFIXES.map((u) => new URL(u).hostname));
+  // Yahoo for prices, and the hosts of the built-in dividend-date connectors
+  assert.deepEqual(manifest.network, [...ALLOWED_PREFIXES.map((u) => new URL(u).hostname), ...PAYOUT_HOSTS]);
 
   const tables = Object.fromEntries([...read('muse/server/src/schema.ts').matchAll(/sqliteTable\('(\w+)', \{([\s\S]*?)\n\}\)/g)]
     .map(([, name, body]) => [name, [...body.matchAll(/(?:text|integer)\('(\w+)'\)/g)].map((m) => m[1])]));
@@ -108,7 +113,7 @@ test('its steps cover a new space and any existing one, and every key they name 
     const steps = manifest.howToUse[kind];
     assert.ok(Array.isArray(steps) && steps.length >= 5, kind);
     for (const step of steps) {
-      for (const [key] of step.matchAll(/\b(?:app|starterParts|storage|checks|howToUse)\.[A-Za-z]\w*(?:\.[A-Za-z]\w*)*/g)) {
+      for (const [key] of step.matchAll(/\b(?:app|starterParts|storage|checks|howToUse|payouts)\.[A-Za-z]\w*(?:\.[A-Za-z]\w*)*/g)) {
         assert.notEqual(at(key), undefined, `${kind} names ${key}, which isn't in the manifest`);
       }
     }
@@ -117,4 +122,20 @@ test('its steps cover a new space and any existing one, and every key they name 
   for (const key of ['files', 'actions', 'network', 'cron', 'time', 'checks.always']) assert.notEqual(at(key), undefined, key);
   assert.ok('refreshMarketCache' in manifest.actions, 'the steps run refreshMarketCache');
   assert.match(manifest.howToUse.existingSpace.join(' '), /Keep the saved data/);
+});
+
+test('dividend payment dates: the space\'s own connector is kept, and Muse is told how to write it', () => {
+  const own = manifest.spaceOwnFiles?.['server/src/custom-payouts.ts'];
+  assert.equal(own?.template, 'muse/server/src/custom-payouts.ts');
+  assert.match(own.rule, /never replace/);
+  assert.ok(!Object.values(manifest.files).includes('server/src/custom-payouts.ts'), 'an update must not overwrite it');
+  for (const kind of ['newSpace', 'existingSpace']) assert.match(manifest.howToUse[kind].join(' '), /payouts\.forMuse/, kind);
+  assert.match(manifest.howToUse.existingSpace.join(' '), /spaceOwnFiles/);
+  assert.ok(Array.isArray(manifest.payouts.forMuse) && manifest.payouts.forMuse.length >= 4);
+  assert.match(manifest.payouts.forMuse.join(' '), /CUSTOM_HOSTS/);
+  assert.match(manifest.payouts.forMuse.join(' '), /never estimate/);
+  // nothing for the user to set up
+  assert.ok(manifest.notNeeded.includes('API keys or cookies'));
+  assert.doesNotMatch(read('muse/server/src/payouts.ts'), /apikey|api_key|token=/i);
+  assert.match(read('muse/server/src/actions.ts'), /from '\.\/custom-payouts'/);
 });

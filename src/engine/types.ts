@@ -69,6 +69,8 @@ export interface Portfolio {
   customAssets: CustomAsset[];
   goal: GoalPlan | null;
   rebalance: { mode: 'pct' | 'value'; targets: Record<string, number>; extraAssets: string[]; cashValue?: number | null };
+  /** payment dates you typed for automatic dividends, by "SYMBOL|exDate" (they win over any connector's) */
+  payDates?: Record<string, string>;
 }
 
 export interface Preferences {
@@ -143,10 +145,33 @@ export interface Profile {
   error?: string;
 }
 
+/** one dividend's dates as the company announced them, from an exchange connector (muse/server/src/payouts.ts) */
+export interface PayoutRecord {
+  exDate: string;
+  /** null while the company hasn't published it */
+  payDate: string | null;
+  recordDate?: string | null;
+  /** per share, in `currency` */
+  amount?: number | null;
+  currency?: string | null;
+  /** sgx, nasdaq, asx, custom (the Muse space's own connector), ... */
+  source: string;
+}
+
+/** what is known about a holding's dividend dates; source null means no connector covers it (yet) */
+export interface PayoutInfo {
+  records: PayoutRecord[];
+  source: string | null;
+  checkedAt: number;
+  error?: string;
+}
+
 export interface MarketBundle {
   charts: Record<string, ChartData>;
   quotes: Record<string, Quote>;
   profiles: Record<string, Profile>;
+  /** dividend payment dates by symbol (none at all where no route to a connector exists) */
+  payouts?: Record<string, PayoutInfo>;
 }
 
 // ---------- engine output ----------
@@ -167,6 +192,11 @@ export interface LedgerEntry {
   auto: null | 'deposit' | 'dividend' | 'tax';
   /** an automatic dividend's withholding tax, base currency (it is also booked as its own Taxes entry) */
   taxBase?: number;
+  /**
+   * an automatic dividend (and its withholding) is income on its ex-date, but its cash moves on this date: until
+   * then it is "to be paid". null: the payment date isn't known, so it stays to be paid. Absent: cash moves on `date`.
+   */
+  payDate?: string | null;
   status: 'confirmed' | 'upcoming';
   sourceId?: string;
   warning?: string;
@@ -178,6 +208,8 @@ export interface DayPoint {
   cash: number;
   holdingsValue: number;
   netDeposits: number;
+  /** dividends past their ex-date and not paid yet, after withholding (part of value, not of cash) */
+  toBePaid: number;
   flow: number; // external flow on that day (deposits - withdrawals)
   grossDeposits: number;
   twrIndex: number;
@@ -243,7 +275,14 @@ export interface Holding {
 export interface DividendEvent {
   symbol: string;
   exDate: string;
+  /** the payment date, or where it isn't known the ex-date, to place it in time (see payKnown) */
   payDate: string;
+  /** whether payDate is the payment date the company published (or you typed) */
+  payKnown: boolean;
+  /** where the payment date came from: sgx, nasdaq, asx, custom, you; null when not known */
+  paySource: string | null;
+  /** a Dividend transaction you entered (its date is when it was paid), not one found automatically */
+  manual?: boolean;
   perShare: number;
   shares: number;
   currency: string;
@@ -251,5 +290,6 @@ export interface DividendEvent {
   amountBase: number;
   /** withholding tax on it in the base currency (the portfolio's dividend tax rate; 0 for dividends you entered) */
   taxBase: number;
-  status: 'received' | 'confirmed' | 'estimated';
+  /** received: paid into cash; toBePaid: past its ex-date, not paid yet; confirmed: ex-date ahead; estimated: projected */
+  status: 'received' | 'toBePaid' | 'confirmed' | 'estimated';
 }

@@ -49,6 +49,10 @@ window.portfolioHost = {
   async saveMarketCache(entries: unknown[]) {
     return callAction('saveSnapshotEntries', { entries });
   },
+  // dividend payment dates from the exchanges' own data (server/src/payouts.ts), saved for every device
+  async fetchPayouts(asks: unknown[], opts: { force?: boolean } = {}) {
+    return callAction('getPayouts', { asks, force: opts.force === true });
+  },
 };
 
 export {};

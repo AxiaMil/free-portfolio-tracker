@@ -31,8 +31,14 @@ function portfolio(rate: number): Portfolio {
   };
 }
 
+/** the company's published payment dates for both dividends (an exchange connector's records) */
+const PAID = { TEST: { source: 'nasdaq', checkedAt: 1, records: [
+  { exDate: '2026-03-02', payDate: '2026-03-16', amount: 0.5, currency: 'USD', source: 'nasdaq' },
+  { exDate: '2025-12-01', payDate: '2025-12-15', amount: 0.5, currency: 'USD', source: 'nasdaq' },
+] } };
+
 function run(rate: number) {
-  const m = new MarketView({ charts: { TEST: chart() }, quotes: {}, profiles: {} }, 'USD', TODAY, []);
+  const m = new MarketView({ charts: { TEST: chart() }, quotes: {}, profiles: {}, payouts: PAID }, 'USD', TODAY, []);
   const r = computePortfolio(portfolio(rate), m, { costMethod: 'FIFO', today: TODAY });
   return { r, events: buildDividendEvents(r, m) };
 }
@@ -41,7 +47,7 @@ const close = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-9, `${a} 
 
 test('30% withholding: gross 100, withheld 30, net 70', () => {
   const { r, events } = run(30);
-  const received = events.filter((e) => e.label === 'Received');
+  const received = events.filter((e) => e.label === 'Paid');
   assert.equal(received.length, 2);
   close(received.reduce((s, e) => s + e.grossBase, 0), 100);
   close(received.reduce((s, e) => s + e.taxBase, 0), 30);

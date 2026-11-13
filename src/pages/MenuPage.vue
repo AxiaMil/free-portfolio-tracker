@@ -11,6 +11,7 @@ import SectionDisplay from '../components/settings/SectionDisplay.vue';
 import SectionCalc from '../components/settings/SectionCalc.vue';
 import SectionAppearance from '../components/settings/SectionAppearance.vue';
 import SectionData from '../components/settings/SectionData.vue';
+import SectionPayouts from '../components/settings/SectionPayouts.vue';
 import PortfolioSettings from '../components/settings/PortfolioSettings.vue';
 import { REPORTS, SECTIONS, sectionKey, type SectionKey } from '../components/settings/reports.ts';
 import { storageInfo } from '../platform/storage.ts';
@@ -23,8 +24,8 @@ const route = useRoute();
 const router = useRouter();
 
 const section = computed<SectionKey | null>(() => sectionKey(route.params.section));
-const COMPONENTS = { display: SectionDisplay, calculation: SectionCalc, appearance: SectionAppearance, data: SectionData } as const;
-const TITLES: Record<SectionKey, string> = { portfolio: 'Portfolio Settings', display: 'Display Preferences', calculation: 'Calculation Methods', appearance: 'Appearance', data: 'Data & Backup' };
+const COMPONENTS = { display: SectionDisplay, calculation: SectionCalc, appearance: SectionAppearance, dividends: SectionPayouts, data: SectionData } as const;
+const TITLES: Record<SectionKey, string> = { portfolio: 'Portfolio Settings', display: 'Display Preferences', calculation: 'Calculation Methods', appearance: 'Appearance', dividends: 'Dividend Dates', data: 'Data & Backup' };
 
 // desktop: account sections open in a dialog over the page; closing it goes back to /menu
 const dialogOpen = computed({
@@ -49,6 +50,7 @@ const PHONE_ITEMS: Array<{ key: SectionKey; title: string; icon: string }> = [
   { key: 'display', title: 'Display Preferences', icon: 'mdi-tune-variant' },
   { key: 'calculation', title: 'Calculation Methods', icon: 'mdi-calculator' },
   { key: 'appearance', title: 'Appearance', icon: 'mdi-palette-outline' },
+  { key: 'dividends', title: 'Dividend Dates', icon: 'mdi-calendar-check' },
   { key: 'data', title: 'Data & Backup', icon: 'mdi-database-outline' },
 ];
 

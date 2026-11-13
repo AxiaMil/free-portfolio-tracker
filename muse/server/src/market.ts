@@ -1,17 +1,21 @@
 // Server-side market logic for the Muse space: the yahooGet allow-list, the market-data snapshot and the scheduled
-// refresh. Plain TypeScript with no imports, so it runs in any server runtime (Muse's Bun runtime, Node, a worker).
-// Storage comes in through the small `SnapshotStore` interface; actions.ts connects it to this space's tables.
+// refresh. Plain TypeScript with no code imports, so it runs in any server runtime (Muse's Bun runtime, Node, a
+// worker). Storage comes in through the small `SnapshotStore` interface and the dividend-date connectors through
+// `PayoutKit`; actions.ts connects both.
 //
 // Snapshot rows are raw Yahoo responses, keyed exactly as the app asks for them:
 //   chart:<SYMBOL>          daily history, dividends and splits (6 years)
 //   spark:<SYM,SYM,...>     latest quotes, in the app's chunks of 20
 //   search:<SYMBOL>         company profile (name, sector, industry)
+// and, from the exchanges' own data (payouts.ts):
+//   payouts:<SYMBOL>        each dividend's ex-date and payment date: { records, source, checkedAt, error? }
 // The app reads them through window.portfolioHost.loadMarketCache and parses them like live answers.
+import type { CustomPayouts, PayoutAsk, PayoutRecord, PayoutResult } from './payouts';
 
 export const ALLOWED_PREFIXES = ['https://query1.finance.yahoo.com/', 'https://query2.finance.yahoo.com/'];
 const Q1 = 'https://query1.finance.yahoo.com';
 const Q2 = 'https://query2.finance.yahoo.com';
-export const SNAPSHOT_PREFIXES = ['chart:', 'spark:', 'search:'];
+export const SNAPSHOT_PREFIXES = ['chart:', 'spark:', 'search:', 'payouts:'];
 const HISTORY_YEARS = 6; // same window as the app
 const SPARK_BATCH = 20; // Yahoo's limit per quote request, and the app's chunk size
 const PARALLEL = 6; // requests at a time
@@ -33,6 +37,13 @@ export interface SnapshotStore {
 }
 
 export type FetchLike = (url: string, init?: { headers?: Record<string, string>; signal?: AbortSignal }) => Promise<{ status: number; text(): Promise<string> }>;
+
+/** payouts.ts's connectors and the space's own (custom-payouts.ts), handed in by actions.ts */
+export interface PayoutKit {
+  fetchPayouts: (a: PayoutAsk, fetchImpl: FetchLike, custom?: CustomPayouts) => Promise<PayoutResult>;
+  mergePayouts: (before: PayoutRecord[], fresh: PayoutRecord[]) => PayoutRecord[];
+  custom?: CustomPayouts;
+}
 
 // ---------------------------------------------------------------- yahooGet
 
@@ -120,28 +131,34 @@ async function inChunks<T>(items: T[], size: number, fn: (item: T) => Promise<vo
   for (let i = 0; i < items.length; i += size) await Promise.all(items.slice(i, i + size).map(fn));
 }
 
-export interface RefreshResult { ok: true; symbols: number; updated: number; failed: number; at: number }
+export interface RefreshResult { ok: true; symbols: number; updated: number; failed: number; payouts: number; at: number }
 
 /**
  * Brings the snapshot up to date for the saved portfolio: price history for every asset, benchmark and FX pair,
  * quotes for all of them, and company profiles for the assets. A failed fetch never deletes or overwrites a row,
  * so the last known data is always kept. Never throws for a missing or unreadable portfolio.
  */
-export async function refreshMarketCache(store: SnapshotStore, fetchImpl: FetchLike = fetch as unknown as FetchLike, now = Date.now()): Promise<RefreshResult> {
+export async function refreshMarketCache(store: SnapshotStore, fetchImpl: FetchLike = fetch as unknown as FetchLike, now = Date.now(), kit?: PayoutKit): Promise<RefreshResult> {
   const need = neededSymbols(await store.readState());
-  if (!need) return { ok: true, symbols: 0, updated: 0, failed: 0, at: now };
+  if (!need) return { ok: true, symbols: 0, updated: 0, failed: 0, payouts: 0, at: now };
   const rows: SnapshotRow[] = [];
   let failed = 0;
   const keep = (key: string, body: unknown) => rows.push({ key, data: JSON.stringify(body), fetchedAt: now });
 
   // 1. price history; each instrument's own currency decides which FX pairs are needed
   const currencies = new Set(need.currencies);
+  const payers: PayoutAsk[] = [];
+  const assetSet = new Set(need.assets);
   const charts = async (symbols: string[]) => inChunks(symbols, PARALLEL, async (s) => {
     const body = await tryGet(chartUrl(s, now), fetchImpl);
     const result = body?.chart?.result?.[0];
     if (!result) { failed++; return; }
     keep(`chart:${s}`, body);
     if (result.meta?.currency) currencies.add(currencyCode(result.meta.currency));
+    // holdings that have paid a dividend get their payment dates looked up (step 4)
+    if (assetSet.has(s) && result.events?.dividends && Object.keys(result.events.dividends).length) {
+      payers.push({ symbol: s, exchange: result.meta?.exchangeName ?? null, currency: result.meta?.currency ?? null, name: result.meta?.longName ?? result.meta?.shortName ?? null });
+    }
   });
   await charts([...need.assets, ...need.benchmarks]);
   currencies.delete(need.base);
@@ -169,13 +186,80 @@ export async function refreshMarketCache(store: SnapshotStore, fetchImpl: FetchL
   });
 
   if (rows.length) await store.writeRows(rows);
+
+  // 4. payment dates from the exchanges, at most once a day per holding (payouts.ts)
+  const payouts = kit ? await updatePayouts(store, payers, kit, { now, fetchImpl }) : { checked: 0 };
+
   // quote chunks from an older symbol list are replaced by this run's, once all of this run's arrived
   if (sparkOk) {
     const current = new Set(sparkKeys);
     const stale = (await store.readRows()).map((r) => r.key).filter((k) => k.startsWith('spark:') && !current.has(k));
     if (stale.length) await store.deleteRows(stale);
   }
-  return { ok: true, symbols: need.assets.length + need.benchmarks.length + fx.length, updated: rows.length, failed, at: now };
+  return { ok: true, symbols: need.assets.length + need.benchmarks.length + fx.length, updated: rows.length, failed, payouts: payouts.checked, at: now };
+}
+
+// ---------------------------------------------------------------- dividend payment dates
+
+/** a holding's known payouts, as saved under payouts:<SYMBOL> */
+export interface PayoutRow {
+  records: PayoutRecord[];
+  /** the connector that answered last, or null when none covers the holding */
+  source: string | null;
+  checkedAt: number;
+  error?: string;
+}
+
+/** each holding is looked up at most this often by the scheduled refresh: companies announce dates days ahead */
+export const PAYOUT_TTL_MS = 20 * 3600_000;
+/** "Check now" in the app asks again at most this often */
+const PAYOUT_FORCE_GAP_MS = 60_000;
+
+async function payoutRows(store: SnapshotStore): Promise<Map<string, PayoutRow>> {
+  const out = new Map<string, PayoutRow>();
+  for (const r of await store.readRows()) {
+    if (!r.key.startsWith('payouts:')) continue;
+    try { out.set(r.key.slice(8), JSON.parse(r.data)); } catch { /* skip */ }
+  }
+  return out;
+}
+
+/**
+ * Looks up payment dates for `asks` whose saved row is older than PAYOUT_TTL_MS (or, with `force`, a minute),
+ * merges them into what was saved (a failed look-up never deletes a date) and saves them. Returns every asked
+ * holding's row and how many were looked up now. Never throws for a failed look-up.
+ */
+export async function updatePayouts(store: SnapshotStore, asks: PayoutAsk[], kit: PayoutKit, opts: { force?: boolean; now?: number; fetchImpl?: FetchLike } = {}): Promise<{ rows: Record<string, PayoutRow>; checked: number }> {
+  const now = opts.now ?? Date.now();
+  const known = await payoutRows(store);
+  const out: Record<string, PayoutRow> = {};
+  const save: SnapshotRow[] = [];
+  await inChunks(asks, 3, async (a) => {
+    const prev = known.get(a.symbol);
+    const age = prev ? now - prev.checkedAt : Infinity;
+    if (prev && (opts.force ? age < PAYOUT_FORCE_GAP_MS : age < PAYOUT_TTL_MS)) { out[a.symbol] = prev; return; }
+    const r = await kit.fetchPayouts(a, (opts.fetchImpl ?? (fetch as unknown as FetchLike)), kit.custom);
+    const row: PayoutRow = {
+      records: kit.mergePayouts(prev?.records ?? [], r.records),
+      source: r.source ?? (r.error ? prev?.source ?? null : null),
+      checkedAt: now,
+      ...(r.error ? { error: r.error } : {}),
+    };
+    out[a.symbol] = row;
+    save.push({ key: `payouts:${a.symbol}`, data: JSON.stringify(row), fetchedAt: now });
+  });
+  if (save.length) await store.writeRows(save);
+  return { rows: out, checked: save.length };
+}
+
+/** the getPayouts action: the app's "Check now", and its first look at a holding the scheduled refresh hasn't reached */
+export async function getPayouts(store: SnapshotStore, input: unknown, kit: PayoutKit, fetchImpl: FetchLike = fetch as unknown as FetchLike) {
+  const i = (input ?? {}) as { asks?: unknown; force?: unknown };
+  const asks: PayoutAsk[] = (Array.isArray(i.asks) ? i.asks : []).slice(0, 60)
+    .filter((a: any) => typeof a?.symbol === 'string' && a.symbol.length <= 30)
+    .map((a: any) => ({ symbol: a.symbol.toUpperCase(), exchange: typeof a.exchange === 'string' ? a.exchange : null, currency: typeof a.currency === 'string' ? a.currency : null, name: typeof a.name === 'string' ? a.name : null }));
+  const { rows } = await updatePayouts(store, asks, kit, { force: i.force === true, fetchImpl });
+  return { ok: true as const, payouts: rows };
 }
 
 // ---------------------------------------------------------------- read and save the snapshot

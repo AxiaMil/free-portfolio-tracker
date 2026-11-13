@@ -1,13 +1,14 @@
 // Dividend analytics for the Dividends page: growth-adjusted projections, 12-month windows,
 // headline yields, ticker x month pivots and chart buckets. Pure functions over the engine result.
 // Every amount here is net of the portfolio's withholding tax (what actually reaches the portfolio's cash);
+// a dividend reaches cash on its payment date and is "to be paid" from its ex-date until then;
 // the gross amount and the tax are kept on each event so the page can show gross - withholding = net.
 import type { EngineResult } from './portfolio.ts';
 import type { MarketView } from './market.ts';
 import type { DividendEvent } from './types.ts';
 import { addDays, addMonths, addYears, daysBetween } from './util.ts';
 
-export type DivLabel = 'Received' | 'Confirmed' | 'Estimated' | 'Estimated*';
+export type DivLabel = 'Paid' | 'To be paid' | 'Confirmed' | 'Estimated';
 
 export interface DivEvent extends DividendEvent {
   /** net amount in the base currency: gross - withholding */
@@ -15,7 +16,13 @@ export interface DivEvent extends DividendEvent {
   /** gross amount before withholding, in the base currency */
   grossBase: number;
   key: string;
+  /** not in your cash yet: to be paid, confirmed or estimated */
   upcoming: boolean;
+  /**
+   * where it sits in time on this page: its payment date, or, for one to be paid whose payment date isn't published,
+   * today (it is due, on a day not known yet)
+   */
+  when: string;
   label: DivLabel;
   /** dividend per share converted to the base currency */
   perShareBase: number;
@@ -61,10 +68,8 @@ export function buildDividendEvents(r: EngineResult, m: MarketView): DivEvent[] 
     const amountBase = grossBase - taxBase;
     const netShare = grossBase ? amountBase / grossBase : 1;
     const perShare = d.perShare * g * netShare;
-    const prof = m.profile(d.symbol);
-    let label: DivLabel = 'Received';
-    if (d.status === 'confirmed') label = prof?.dividendDate ? 'Confirmed' : 'Estimated*';
-    else if (d.status === 'estimated') label = 'Estimated';
+    const label: DivLabel = d.status === 'received' ? 'Paid' : d.status === 'toBePaid' ? 'To be paid' : d.status === 'confirmed' ? 'Confirmed' : 'Estimated';
+    const when = d.status === 'toBePaid' && !d.payKnown ? (r.today > d.exDate ? r.today : d.exDate) : d.payDate;
     return {
       ...d,
       perShare,
@@ -73,12 +78,13 @@ export function buildDividendEvents(r: EngineResult, m: MarketView): DivEvent[] 
       taxBase,
       key: `${d.symbol}-${d.exDate}-${i}`,
       upcoming: d.status !== 'received',
+      when,
       label,
       perShareBase: d.shares ? amountBase / d.shares : 0,
       growth: g,
     };
   });
-  return out.sort((a, b) => a.payDate.localeCompare(b.payDate) || a.symbol.localeCompare(b.symbol));
+  return out.sort((a, b) => a.when.localeCompare(b.when) || a.symbol.localeCompare(b.symbol));
 }
 
 export function endOfMonth(isoDate: string): string {
@@ -104,17 +110,17 @@ export interface DivWindow {
   events: DivEvent[];
 }
 
-/** upcoming payouts from today through the end of the 12th calendar month (current month included) */
+/** payouts still to come into cash, from today through the end of the 12th calendar month (current month included) */
 export function upcomingWindow(events: DivEvent[], today: string): DivWindow {
   const to = endOfMonth(addMonths(`${today.slice(0, 7)}-01`, 11));
-  return { from: today, to, months: monthKeys(today, to), events: events.filter((e) => e.upcoming && e.payDate <= to) };
+  return { from: today, to, months: monthKeys(today, to), events: events.filter((e) => e.upcoming && e.when <= to) };
 }
 
-/** payouts received over the trailing 12 months (today - 1y, today] */
+/** payouts paid into cash over the trailing 12 months (today - 1y, today] */
 export function historicalWindow(events: DivEvent[], today: string, yearsBack = 0): DivWindow {
   const to = addYears(today, -yearsBack);
   const from = addYears(to, -1);
-  return { from, to, months: monthKeys(addDays(from, 1), to), events: events.filter((e) => !e.upcoming && e.payDate > from && e.payDate <= to) };
+  return { from, to, months: monthKeys(addDays(from, 1), to), events: events.filter((e) => !e.upcoming && e.when > from && e.when <= to) };
 }
 
 export interface DivSummary {
@@ -179,7 +185,7 @@ export function pivotByMonth(events: DivEvent[], months: string[]): { rows: Pivo
   let total = 0;
   const allowed = new Set(months);
   for (const e of events) {
-    const k = e.payDate.slice(0, 7);
+    const k = e.when.slice(0, 7);
     if (!allowed.has(k)) continue;
     const row = rows.get(e.symbol) ?? { symbol: e.symbol, cells: {}, total: 0 };
     row.cells[k] = (row.cells[k] ?? 0) + e.amountBase;
@@ -207,8 +213,8 @@ export interface DivBucket {
 /** stacked received / upcoming totals per calendar bucket, with no gaps between first and last */
 export function bucketize(events: DivEvent[], f: Freq): DivBucket[] {
   if (!events.length) return [];
-  const first = events[0].payDate;
-  const last = events[events.length - 1].payDate;
+  const first = events[0].when;
+  const last = events[events.length - 1].when;
   const keys: string[] = [];
   for (const m of monthKeys(first, last)) {
     const k = bucketKey(`${m}-01`, f);
@@ -216,7 +222,7 @@ export function bucketize(events: DivEvent[], f: Freq): DivBucket[] {
   }
   const map = new Map<string, DivBucket>(keys.map((k) => [k, { key: k, received: 0, upcoming: 0, tickers: [] }]));
   for (const e of events) {
-    const b = map.get(bucketKey(e.payDate, f));
+    const b = map.get(bucketKey(e.when, f));
     if (!b) continue;
     if (e.upcoming) b.upcoming += e.amountBase;
     else b.received += e.amountBase;
@@ -241,6 +247,7 @@ export interface PositionRow {
   receivedTTM: number;
   receivedAll: number;
   nextEx: string | null;
+  /** the next payment date, null when it isn't published yet */
   nextPay: string | null;
   nextAmount: number | null;
 }
@@ -269,7 +276,7 @@ export function positionRows(events: DivEvent[], r: EngineResult): PositionRow[]
       receivedTTM: sumAmt(recv),
       receivedAll: sumAmt(events.filter((e) => e.symbol === h.symbol && !e.upcoming)),
       nextEx: next?.exDate ?? null,
-      nextPay: next?.payDate ?? null,
+      nextPay: next?.payKnown ? next.payDate : null,
       nextAmount: next?.amountBase ?? null,
     });
   }

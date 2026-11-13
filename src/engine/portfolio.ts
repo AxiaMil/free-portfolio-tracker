@@ -27,11 +27,16 @@ export interface EngineResult {
   dateIndex: Map<string, number>;
   holdings: Holding[]; // open positions, sorted by market value desc
   cashRow: Holding;
+  /** "Dividends to be paid" shown beside cash, or null when there are none */
+  toBePaidRow: Holding | null;
   closed: string[];
   lots: Lot[];
   dividends: DividendEvent[];
   value: number;
+  /** cash paid in: dividends count only from their payment date */
   cash: number;
+  /** dividends past their ex-date, not paid yet, after withholding: in value, not in cash (value = cash + holdings + toBePaid) */
+  toBePaid: number;
   netDeposits: number;
   pnl: { unrealized: number; realized: number; dividends: number; fees: number; taxes: number; interests: number; others: number };
   symbols: string[];
@@ -73,7 +78,10 @@ export function resolveTxns(p: Portfolio, m: MarketView): LedgerEntry[] {
   return out.sort((a, b) => a.date.localeCompare(b.date) || (ORDER[a.action] ?? 9) - (ORDER[b.action] ?? 9));
 }
 
+/** usual days from ex-date to payment, for projected payouts only: the latest published ones, else the profile, else 0 */
 function payLag(m: MarketView, symbol: string): number {
+  const lags = (m.payoutInfo(symbol)?.records ?? []).filter((r) => r.payDate).slice(0, 4).map((r) => daysBetween(r.exDate, r.payDate!)).filter((x) => x >= 0 && x <= 120);
+  if (lags.length) return lags.sort((a, b) => a - b)[Math.floor(lags.length / 2)];
   const p = m.profile(symbol);
   if (p?.exDividendDate && p?.dividendDate) {
     const lag = daysBetween(p.exDividendDate, p.dividendDate);
@@ -119,6 +127,9 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
   }
 
   // ---------- auto dividends (+ withholding tax) ----------
+  // A dividend is income on its ex-date (the share price drops by it that morning), so it counts in value and gains
+  // from then. Its cash arrives on the payment date the company published, from an exchange connector or typed by
+  // you: until then it is "to be paid". With no published date it stays to be paid; it is never guessed.
   const autoEntries: LedgerEntry[] = [];
   const dividendEvents: DividendEvent[] = [];
   const firstDate = user.length ? user[0].date : today;
@@ -126,37 +137,43 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
   if (p.autoDividend) {
     for (const sym of assetSymbols) {
       if (m.custom.has(sym)) continue;
-      const lag = payLag(m, sym);
       const ccy = m.currencyOf(sym);
       const manual = user.filter((e) => e.symbol === sym && e.action === 'Dividend');
       for (const [exDate, perShare] of m.dividends(sym)) {
         if (exDate <= firstDate) continue;
         const shares = sharesBefore(user, sym, exDate, m, p.margin);
         if (shares <= 1e-9) continue;
-        const payDate = addDays(exDate, lag);
-        if (manual.some((x) => x.date >= addDays(exDate, -5) && x.date <= addDays(payDate, 20))) continue;
-        const received = payDate <= today;
-        const fx = m.fxAt(ccy, received ? payDate : today);
+        const typed = p.payDates?.[`${sym}|${exDate}`];
+        const rec = m.payoutFor(sym, exDate);
+        const payDate = typed && typed >= exDate ? typed : rec?.payDate ?? null;
+        const paySource = typed && typed >= exDate ? 'you' : rec?.payDate ? rec.source : null;
+        if (manual.some((x) => x.date >= addDays(exDate, -5) && x.date <= addDays(payDate ?? exDate, 20))) continue;
+        const ahead = exDate > today;
+        const paid = !ahead && payDate != null && payDate <= today;
+        // converted on the day it is paid; until then at today's rate
+        const fx = m.fxAt(ccy, paid ? payDate! : today);
         const amountLocal = perShare * shares;
         const taxBase = amountLocal * fx * taxRate;
-        dividendEvents.push({ symbol: sym, exDate, payDate, perShare, shares, currency: ccy, amountBase: amountLocal * fx, taxBase, status: received ? 'received' : 'confirmed' });
-        const entry: LedgerEntry = {
-          id: `auto-div-${sym}-${exDate}`, date: payDate, action: 'Dividend', symbol: sym, price: perShare, currency: ccy, shares,
-          commission: 0, commissionBase: 0, amountBase: amountLocal * fx, fx, auto: 'dividend', taxBase, status: received ? 'confirmed' : 'upcoming',
-        };
-        autoEntries.push(entry);
+        dividendEvents.push({
+          symbol: sym, exDate, payDate: payDate ?? exDate, payKnown: payDate != null, paySource, perShare, shares, currency: ccy,
+          amountBase: amountLocal * fx, taxBase, status: ahead ? 'confirmed' : paid ? 'received' : 'toBePaid',
+        });
+        autoEntries.push({
+          id: `auto-div-${sym}-${exDate}`, date: exDate, payDate, action: 'Dividend', symbol: sym, price: perShare, currency: ccy, shares,
+          commission: 0, commissionBase: 0, amountBase: amountLocal * fx, fx, auto: 'dividend', taxBase, status: ahead ? 'upcoming' : 'confirmed',
+        });
         if (taxRate > 0) {
           autoEntries.push({
-            id: `auto-tax-${sym}-${exDate}`, date: payDate, action: 'Taxes', symbol: 'CASH', price: 1, currency: ccy, shares: amountLocal * taxRate,
-            commission: 0, commissionBase: 0, amountBase: amountLocal * taxRate * fx, fx, auto: 'tax', status: received ? 'confirmed' : 'upcoming',
+            id: `auto-tax-${sym}-${exDate}`, date: exDate, payDate, action: 'Taxes', symbol: 'CASH', price: 1, currency: ccy, shares: amountLocal * taxRate,
+            commission: 0, commissionBase: 0, amountBase: amountLocal * taxRate * fx, fx, auto: 'tax', status: ahead ? 'upcoming' : 'confirmed',
           });
         }
       }
     }
   }
   for (const e of user.filter((x) => x.action === 'Dividend' && x.symbol !== 'CASH')) {
-    // entered by hand: recorded as received, with no automatic withholding
-    dividendEvents.push({ symbol: e.symbol, exDate: e.date, payDate: e.date, perShare: e.price, shares: e.shares, currency: e.currency, amountBase: e.amountBase, taxBase: 0, status: 'received' });
+    // entered by hand: paid on the date you gave, with no automatic withholding
+    dividendEvents.push({ symbol: e.symbol, exDate: e.date, payDate: e.date, payKnown: true, paySource: 'you', manual: true, perShare: e.price, shares: e.shares, currency: e.currency, amountBase: e.amountBase, taxBase: 0, status: 'received' });
   }
 
   // ---------- merge + auto deposits ----------
@@ -165,7 +182,8 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
   );
   const ledger: LedgerEntry[] = [];
   let cashRun = 0;
-  const cashDelta = (e: LedgerEntry): number => {
+  /** what an entry does to cash, whenever that happens */
+  const cashFlowOf = (e: LedgerEntry): number => {
     switch (e.action) {
       case 'Buy': return -(e.amountBase + e.commissionBase);
       case 'Sell': return e.amountBase - e.commissionBase;
@@ -176,19 +194,37 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
         return -e.commissionBase; // transfers / stock dividends only cost commission
     }
   };
+  // an automatic dividend (and its withholding) moves cash on its payment date, not on its ex-date
+  const deferred = (e: LedgerEntry) => e.payDate !== undefined && e.payDate !== e.date;
+  const cashDelta = (e: LedgerEntry): number => (deferred(e) ? 0 : cashFlowOf(e));
+  /** cash that arrives on a date: dividends paid then, after withholding */
+  const settles = new Map<string, number>();
+  for (const e of merged) {
+    if (deferred(e) && e.payDate && e.payDate <= today) settles.set(e.payDate, (settles.get(e.payDate) ?? 0) + cashFlowOf(e));
+  }
+  const settleDays = [...settles.keys()].sort();
+  let settled = 0;
+  let owed = 0; // to be paid: income booked, cash not arrived yet
   for (let i = 0; i < merged.length; i++) {
     const day = merged[i].date;
+    for (; settled < settleDays.length && settleDays[settled] <= day; settled++) {
+      cashRun += settles.get(settleDays[settled])!;
+      owed -= settles.get(settleDays[settled])!;
+    }
     const dayEntries: LedgerEntry[] = [];
     while (i < merged.length && merged[i].date === day) dayEntries.push(merged[i++]);
     i--;
     for (const e of dayEntries) {
       cashRun += cashDelta(e);
+      if (deferred(e)) owed += cashFlowOf(e);
       ledger.push(e);
     }
-    if (!p.margin && cashRun < -0.004) {
-      const amt = -cashRun;
+    // money spent that you hadn't recorded depositing: an automatic deposit. Dividends to be paid count as yours here,
+    // so one whose payment date isn't published yet never turns into a deposit you didn't make
+    if (!p.margin && cashRun + owed < -0.004) {
+      const amt = -(cashRun + owed);
       ledger.push({ id: `auto-dep-${day}`, date: day, action: 'Deposit', symbol: 'CASH', price: 1, currency: base, shares: amt, commission: 0, commissionBase: 0, amountBase: amt, fx: 1, auto: 'deposit', status: 'confirmed' });
-      cashRun = 0;
+      cashRun += amt;
     }
   }
   const upcomingEntries = autoEntries.filter((e) => e.status === 'upcoming');
@@ -275,14 +311,18 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
     const benchStart: Record<string, number> = {};
     const benchStartLocal: Record<string, number> = {};
     let cash = 0;
+    let toBePaid = 0;
     let nd = 0;
     let gross = 0;
     let prevValue = 0;
     let idx = 1;
     for (const d of eachDay(inception, today)) {
       let flow = 0;
+      const arrives = settles.get(d);
+      if (arrives) { cash += arrives; toBePaid -= arrives; }
       for (const e of byDate.get(d) || []) {
         cash += cashDelta(e);
+        if (deferred(e)) toBePaid += cashFlowOf(e);
         const f = e.symbol !== 'CASH' ? m.splitFactorAfter(e.symbol, e.date) : 1;
         if (e.action === 'Buy' || e.action === 'Transfer in' || e.action === 'Stock dividend') shares[e.symbol] = (shares[e.symbol] || 0) + e.shares * f;
         if (e.action === 'Sell' || e.action === 'Transfer out') {
@@ -305,7 +345,7 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
         if (px == null) continue;
         hv += q * px * m.fxAt(ccyOf[s], d);
       }
-      const value = cash + hv;
+      const value = cash + hv + toBePaid;
       const denom = prevValue + flow;
       if (series.length === 0) idx = flow > 0 ? value / flow : 1;
       else if (denom > 1e-9) idx = idx * (value / denom);
@@ -329,7 +369,7 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
         }
       }
       dateIndex.set(d, series.length);
-      series.push({ date: d, value, cash, holdingsValue: hv, netDeposits: nd, flow, grossDeposits: gross, twrIndex: idx, gain: value - nd, bench, benchIndex, benchLocal });
+      series.push({ date: d, value, cash, holdingsValue: hv, netDeposits: nd, toBePaid, flow, grossDeposits: gross, twrIndex: idx, gain: value - nd, bench, benchIndex, benchLocal });
       prevValue = value;
     }
   }
@@ -338,6 +378,7 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
   const last = series[series.length - 1];
   const value = last ? last.value : 0;
   const cash = last ? last.cash : 0;
+  const toBePaid = last ? last.toBePaid : 0;
   const holdings: Holding[] = [];
   const closed: string[] = [];
   for (const sym of assetSymbols) {
@@ -394,7 +435,7 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       ...meta, isCustom: m.custom.has(sym),
     });
   }
-  const totalCost = holdings.reduce((s, h) => s + h.costValue, 0) + cash;
+  const totalCost = holdings.reduce((s, h) => s + h.costValue, 0) + cash + toBePaid;
   for (const h of holdings) {
     h.allocation = value ? h.marketValue / value : 0;
     h.costAllocation = totalCost ? h.costValue / totalCost : 0;
@@ -406,6 +447,10 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
     realized: 0, dividends: 0, fees: 0, totalGain: 0, totalReturn: 0, annualizedReturn: 0, firstDate: inception || today, high52: null, low52: null,
     offHigh52: null, sector: 'Cash', industry: 'Cash', country: 'Cash', region: 'Cash', market: 'Cash', assetType: 'Cash', isCash: true,
   };
+  const toBePaidRow: Holding | null = toBePaid > 0.005 ? {
+    ...cashRow, symbol: 'TO BE PAID', name: 'Dividends to be paid', shares: toBePaid, costValue: toBePaid, marketValue: toBePaid,
+    allocation: value ? toBePaid / value : 0, costAllocation: totalCost ? toBePaid / totalCost : 0,
+  } : null;
 
   // ---------- P&L ----------
   const sumAction = (a: string) => ledger.filter((e) => e.action === a).reduce((s, e) => s + e.amountBase, 0);
@@ -432,10 +477,19 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
     const prof = m.profile(sym);
     const lastAmt = hist.length ? hist[hist.length - 1][1] : 0;
     const known = upcoming.filter((u) => u.symbol === sym);
+    // announced by the company (an exchange connector lists it), with its own amount and dates
+    for (const r of m.payoutInfo(sym)?.records ?? []) {
+      if (r.exDate <= today || r.amount == null || !(r.amount > 0) || (r.currency && r.currency !== h.currency)) continue;
+      if (known.some((k) => Math.abs(daysBetween(k.exDate, r.exDate)) <= 3)) continue;
+      const amountBase = r.amount * h.shares * fxNow;
+      const ev: DividendEvent = { symbol: sym, exDate: r.exDate, payDate: r.payDate ?? r.exDate, payKnown: !!r.payDate, paySource: r.payDate ? r.source : null, perShare: r.amount, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'confirmed' };
+      upcoming.push(ev);
+      known.push(ev);
+    }
     if (prof?.exDividendDate && prof.exDividendDate > today && lastAmt > 0 && !known.some((k) => Math.abs(daysBetween(k.exDate, prof.exDividendDate!)) < 20)) {
-      const payDate = prof.dividendDate && prof.dividendDate >= prof.exDividendDate ? prof.dividendDate : addDays(prof.exDividendDate, lag);
+      const published = prof.dividendDate && prof.dividendDate >= prof.exDividendDate ? prof.dividendDate : null;
       const amountBase = lastAmt * h.shares * fxNow;
-      const ev: DividendEvent = { symbol: sym, exDate: prof.exDividendDate, payDate, perShare: lastAmt, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'confirmed' };
+      const ev: DividendEvent = { symbol: sym, exDate: prof.exDividendDate, payDate: published ?? addDays(prof.exDividendDate, lag), payKnown: !!published, paySource: published ? 'yahoo' : null, perShare: lastAmt, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'confirmed' };
       upcoming.push(ev);
       known.push(ev);
     }
@@ -447,10 +501,10 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
       const payDate = addDays(projEx, lag);
       if (payDate > horizon) continue;
       const amountBase = amt * h.shares * fxNow;
-      upcoming.push({ symbol: sym, exDate: projEx, payDate, perShare: amt, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'estimated' });
+      upcoming.push({ symbol: sym, exDate: projEx, payDate, payKnown: false, paySource: null, perShare: amt, shares: h.shares, currency: h.currency, amountBase, taxBase: p.autoDividend ? amountBase * taxRate : 0, status: 'estimated' });
     }
   }
-  const dividends = [...dividendEvents.filter((d) => d.status === 'received'), ...upcoming].sort((a, b) => a.payDate.localeCompare(b.payDate));
+  const dividends = [...dividendEvents.filter((d) => d.status === 'received' || d.status === 'toBePaid'), ...upcoming].sort((a, b) => a.payDate.localeCompare(b.payDate));
 
   // currencies in use without a rate to the base currency (their amounts count 1:1 until one loads)
   const used = new Set<string>([...user.map((e) => e.currency), ...assetSymbols.map((s) => m.currencyOf(s)), ...benchmarks.map((b) => m.currencyOf(b))]);
@@ -458,7 +512,7 @@ export function computePortfolio(p: Portfolio, m: MarketView, opts: EngineOption
 
   return {
     base, today, inception, userLedger: user, ledger: [...ledger, ...upcomingEntries].sort((a, b) => a.date.localeCompare(b.date)),
-    warnings, series, dateIndex, holdings, cashRow, closed, lots, dividends, value, cash, netDeposits: last ? last.netDeposits : 0, pnl,
+    warnings, series, dateIndex, holdings, cashRow, toBePaidRow, closed, lots, dividends, value, cash, toBePaid, netDeposits: last ? last.netDeposits : 0, pnl,
     symbols: assetSymbols, benchmarks, realizedBySymbol, feesBySymbol, dividendsBySymbol, missingFx,
   };
 }
