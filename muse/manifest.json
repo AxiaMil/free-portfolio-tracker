@@ -30,8 +30,8 @@
   "app": {
     "source": "app/portfolio-tracker.js",
     "copyTo": "client/src/portfolio-tracker.js",
-    "bytes": 2196588,
-    "sha256": "6f97629ee24f85343bac1a258e4bcdd7834df2cb8ae2dbc952081e0b50752690",
+    "bytes": 2197110,
+    "sha256": "ac4b0cc8244c8efc3f19fc4556e6ab30a06020343beff363d3007874e2ef9903",
     "rules": [
       "byte for byte: never edit, rebuild, minify, split, unpack, restyle, translate or port it. bytes and sha256 above are the file's own; npm run build:app writes them",
       "it is the whole front end, full screen; it mounts itself into #app and loads no other file",
