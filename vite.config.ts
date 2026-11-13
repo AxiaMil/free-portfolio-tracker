@@ -15,8 +15,12 @@ const yahoo = (target: string, prefix: string): ProxyOptions => ({
   changeOrigin: true,
   rewrite: (path) => path.slice(prefix.length),
   configure: (proxy) => {
-    // send nothing about the page that asked: no cookies, origin or referrer
-    proxy.on('proxyReq', (req) => { for (const h of ['cookie', 'origin', 'referer']) req.removeHeader(h); });
+    // send nothing about the page that asked: no cookies, origin or referrer, and not the browser's own name.
+    // Yahoo answers 429 to a full browser User-Agent arriving without its cookies, so ask as the Muse server does.
+    proxy.on('proxyReq', (req) => {
+      for (const h of ['cookie', 'origin', 'referer']) req.removeHeader(h);
+      req.setHeader('user-agent', 'Mozilla/5.0 (portfolio-tracker)');
+    });
   },
 });
 const proxy = {

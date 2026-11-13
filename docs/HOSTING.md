@@ -169,11 +169,11 @@ VITE_MARKET_PROXY='https://proxy.example.com/fetch?url={url}' npm run build
 VITE_MARKET_PROXY='https://proxy.example.com/fetch?url=' npm run build
 ```
 
-An nginx reverse proxy for the same-origin route, with the app at the site root (for a sub-folder, put the folder in front of `/yahoo/`):
+An nginx reverse proxy for the same-origin route, with the app at the site root (for a sub-folder, put the folder in front of `/yahoo/`). It replaces the browser's own name with a short fixed one: Yahoo answers *429 Too Many Requests* to a full browser User-Agent that arrives without Yahoo's cookies, and the `npm run dev` / `npm start` forwarder does the same.
 
 ```nginx
-location /yahoo/q1/ { proxy_pass https://query1.finance.yahoo.com/; proxy_set_header Host query1.finance.yahoo.com; proxy_set_header Cookie ""; proxy_ssl_server_name on; }
-location /yahoo/q2/ { proxy_pass https://query2.finance.yahoo.com/; proxy_set_header Host query2.finance.yahoo.com; proxy_set_header Cookie ""; proxy_ssl_server_name on; }
+location /yahoo/q1/ { proxy_pass https://query1.finance.yahoo.com/; proxy_set_header Host query1.finance.yahoo.com; proxy_set_header Cookie ""; proxy_set_header User-Agent "Mozilla/5.0 (portfolio-tracker)"; proxy_ssl_server_name on; }
+location /yahoo/q2/ { proxy_pass https://query2.finance.yahoo.com/; proxy_set_header Host query2.finance.yahoo.com; proxy_set_header Cookie ""; proxy_set_header User-Agent "Mozilla/5.0 (portfolio-tracker)"; proxy_ssl_server_name on; }
 ```
 
 Without any route the app still works with everything you enter: transactions, custom assets with your own prices, goals and backups. Prices of listed stocks, funds and coins then stay empty until a route is available.
